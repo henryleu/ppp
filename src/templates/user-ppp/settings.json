@@ -1,0 +1,22 @@
+{
+  "firstRun": true,
+  "version": "0.1.0",
+  "preferences": {
+    "defaultProjectPath": "~/projects",
+    "autoBackup": true,
+    "theme": "default",
+    "showTips": true
+  },
+  "ai": {
+    "enabled": true,
+    "mcpIntegration": true,
+    "autoSuggest": true
+  },
+  "tracking": {
+    "enableTimeTracking": false,
+    "defaultPriority": "medium",
+    "autoArchive": false
+  },
+  "created": "2025-07-17T00:00:00.000Z",
+  "lastUpdated": "2025-07-17T00:00:00.000Z"
+}

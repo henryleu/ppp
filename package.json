@@ -1,0 +1,45 @@
+{
+  "name": "@ppp/cli",
+  "version": "0.1.0",
+  "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI-assisted markdown files",
+  "main": "dist/index.js",
+  "bin": {
+    "ppp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "bun build --target=node ./src/index.ts --outfile=dist/index.js && bun build --target=node ./src/post-install.ts --outfile=dist/post-install.js && mkdir -p dist/templates/user-ppp && cp -r src/templates/user-ppp/* dist/templates/user-ppp/",
+    "dev": "bun --watch src/index.ts",
+    "dev:help": "bun --watch src/index.ts -- --help",
+    "dev:init": "bun --watch src/index.ts -- init",
+    "start": "bun run dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "bun run dist/post-install.js"
+  },
+  "keywords": [
+    "cli",
+    "productivity",
+    "planning",
+    "markdown",
+    "ai",
+    "mcp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.0",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.14",
+    "@types/prompts": "^2.4.9",
+    "typescript": "^5.8.3",
+    "@types/bun": "latest"
+  },
+  "private": true
+}

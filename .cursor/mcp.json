@@ -1,0 +1,7 @@
+{
+  "ppp": {
+    "command": "bun",
+    "args": ["run", "dist/index.js", "--mcp-server"],
+    "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
+  }
+}
