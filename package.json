@@ -1,6 +1,6 @@
 {
   "name": "@ppp/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI-assisted markdown files",
   "main": "dist/index.js",
   "bin": {
@@ -12,6 +12,7 @@
     "dev:help": "bun --watch src/index.ts -- --help",
     "dev:init": "bun --watch src/index.ts -- init",
     "start": "bun run dist/index.js",
+    "inst": "npm i -g .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "bun run dist/post-install.js"
   },

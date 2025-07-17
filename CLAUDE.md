@@ -79,7 +79,7 @@ src/
 4. **Bundling**: Bun build bundles TypeScript directly to `dist/index.js`
 5. **Shebang**: CLI entry point uses `#!/usr/bin/env bun`
 6. **Interactive Prompts**: Handle project setup with native TypeScript support
-7. **Styled Output**: Tables and emojis for better UX
+7. **Styled Output**: ASCII tables and emojis for better UX (compatible with all terminals)
 8. **MCP Integration**: Server mode enables AI integration via stdio transport
 
 ## MCP Integration
@@ -170,6 +170,11 @@ ppp --mcp-server
    - Verify PPP is the correct version: `ppp --version`
    - Check IDE MCP integration is enabled
    - Look for error messages in IDE console/logs
+
+5. **Table output displays garbled characters**
+   - This has been fixed in recent versions using ASCII characters
+   - Ensure you're using the latest version: `ppp --version`
+   - Tables now use `+`, `-`, `|` characters for universal compatibility
 
 #### Debug Commands
 ```bash

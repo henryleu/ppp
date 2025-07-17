@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import prompts from 'prompts';
-import Table from 'cli-table3';
+import { createTable } from '../utils/table.js';
 
 export async function initCommand() {
   console.log('🚀 Initializing ppp in current directory...\n');
@@ -58,9 +58,9 @@ export async function initCommand() {
     const implContent = `# IMPL.md\n\n## Implementation Notes\n\n### Architecture\n\n- TBD\n\n### Development Notes\n\n- TBD\n`;
     await writeFile('.ppp/IMPL.md', implContent);
 
-    const table = new Table({
+    const table = createTable({
       head: ['File', 'Status'],
-      colWidths: [20, 10]
+      colWidths: [25, 12]
     });
 
     table.push(
