@@ -45,6 +45,58 @@ async function fileExists(path) {
   }
 }
 
+async function validatePppInstalled() {
+  return new Promise(async (resolve) => {
+    const { spawn } = await import('child_process');
+    const proc = spawn('ppp', ['--version'], { stdio: 'pipe' });
+    
+    proc.on('close', (code) => {
+      resolve(code === 0);
+    });
+    
+    proc.on('error', () => {
+      resolve(false);
+    });
+  });
+}
+
+async function testMcpServer() {
+  return new Promise(async (resolve) => {
+    const { spawn } = await import('child_process');
+    const proc = spawn('ppp', ['--mcp-server'], { stdio: 'pipe' });
+    
+    let hasStarted = false;
+    
+    // Give it a moment to start
+    const timeout = setTimeout(() => {
+      if (!hasStarted) {
+        proc.kill();
+        resolve(false);
+      }
+    }, 3000);
+    
+    proc.stdout.on('data', (data) => {
+      // Look for MCP server startup messages
+      if (data.toString().includes('MCP server') || data.toString().includes('stdio')) {
+        hasStarted = true;
+        clearTimeout(timeout);
+        proc.kill();
+        resolve(true);
+      }
+    });
+    
+    proc.on('close', () => {
+      clearTimeout(timeout);
+      resolve(hasStarted);
+    });
+    
+    proc.on('error', () => {
+      clearTimeout(timeout);
+      resolve(false);
+    });
+  });
+}
+
 async function setupMCP(ideType) {
   const config = MCP_CONFIGS[ideType];
   const configPath = config.path;
@@ -104,6 +156,23 @@ async function main() {
   console.log('🚀 PPP MCP Setup Tool');
   console.log('');
   
+  // Validate PPP is globally installed
+  console.log('🔍 Checking if PPP is globally installed...');
+  const isPppInstalled = await validatePppInstalled();
+  
+  if (!isPppInstalled) {
+    console.log('❌ PPP is not globally installed or not found in PATH');
+    console.log('');
+    console.log('📋 Please install PPP globally first:');
+    console.log('   npm install -g @ppp/cli');
+    console.log('');
+    console.log('Then run this setup script again.');
+    return;
+  }
+  
+  console.log('✅ PPP is globally installed');
+  console.log('');
+  
   const questions = [
     {
       type: 'multiselect',
@@ -138,13 +207,34 @@ async function main() {
   
   console.log(`🎉 Setup complete! Successfully configured ${successCount}/${response.ides.length} IDEs.`);
   console.log('');
+  
+  // Test MCP server connectivity
+  if (successCount > 0) {
+    console.log('🧪 Testing MCP server connectivity...');
+    const testResult = await testMcpServer();
+    if (testResult) {
+      console.log('✅ MCP server test successful');
+    } else {
+      console.log('⚠️  MCP server test failed - server may not be responding');
+      console.log('   This is usually normal and the server will work when called by your IDE');
+    }
+    console.log('');
+  }
+  
   console.log('📋 Next steps:');
-  console.log('1. Make sure PPP is installed globally: npm install -g @ppp/cli');
-  console.log('2. Restart your IDE to load the MCP server');
-  console.log('3. Test the configuration:');
+  console.log('1. Restart your IDE to load the MCP server');
+  console.log('2. Test the configuration:');
   console.log('   - VSCode/Cursor: Check MCP status in your IDE');
   console.log('   - Claude Code: Use /mcp command to verify');
   console.log('');
+  
+  if (successCount < response.ides.length) {
+    console.log('🔧 Troubleshooting:');
+    console.log('- Ensure PPP is globally installed: npm install -g @ppp/cli');
+    console.log('- Check file permissions for configuration directories');
+    console.log('- Verify IDE is properly configured for MCP');
+    console.log('');
+  }
 }
 
 main().catch(console.error);

@@ -148,6 +148,41 @@ ppp --mcp-server
 # Or use through your configured IDE
 ```
 
+### Troubleshooting
+
+#### Common Issues and Solutions
+
+1. **"PPP is not globally installed" during setup**
+   - Solution: Install PPP globally with `npm install -g @ppp/cli`
+   - Verify installation: `ppp --version`
+
+2. **MCP server not responding in IDE**
+   - Restart your IDE after configuration
+   - Check if PPP is in your PATH: `which ppp`
+   - Test MCP server manually: `ppp --mcp-server`
+
+3. **Configuration file not found**
+   - Ensure you have write permissions to the configuration directory
+   - For VSCode-based IDEs: Check `.vscode/mcp.json` exists in your workspace
+   - For Claude Code: Check `~/.claude.json` exists in your home directory
+
+4. **MCP server starts but tools are not available**
+   - Verify PPP is the correct version: `ppp --version`
+   - Check IDE MCP integration is enabled
+   - Look for error messages in IDE console/logs
+
+#### Debug Commands
+```bash
+# Test PPP installation
+ppp --version
+
+# Test MCP server startup
+ppp --mcp-server
+
+# Check configuration
+ppp setup-mcp
+```
+
 ### Requirements
 - **Bun**: Install Bun runtime (https://bun.sh)
 - **Dependencies**: Run `bun install` to install packages
