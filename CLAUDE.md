@@ -90,6 +90,7 @@ src/
 - **Prompts**: `project_init`, `project_review` - Common workflow templates
 
 ### Supported IDEs and Configurations
+PPP supports VSCode-based IDEs and Claude Code (not Claude Desktop).
 
 #### VSCode and VSCode-based IDEs (Cursor, Trae, Cline)
 Create `.vscode/mcp.json` in your workspace:
@@ -121,20 +122,6 @@ Add to your `~/.claude.json` file:
 }
 ```
 
-#### Claude Desktop
-Add to your Claude Desktop configuration:
-```json
-{
-  "mcpServers": {
-    "ppp": {
-      "type": "stdio",
-      "command": "ppp",
-      "args": ["--mcp-server"],
-      "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
-    }
-  }
-}
-```
 
 ### Setup Instructions
 

@@ -34,20 +34,6 @@ const MCP_CONFIGS = {
       }
     }
   },
-  claudeDesktop: {
-    name: 'Claude Desktop',
-    path: join(homedir(), '.claude-desktop/config.json'),
-    config: {
-      mcpServers: {
-        ppp: {
-          type: 'stdio',
-          command: 'ppp',
-          args: ['--mcp-server'],
-          description: 'Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance'
-        }
-      }
-    }
-  }
 };
 
 async function fileExists(path) {
@@ -125,8 +111,7 @@ async function main() {
       message: 'Which IDEs would you like to configure?',
       choices: [
         { title: 'VSCode/Cursor/Trae/Cline (.vscode/mcp.json)', value: 'vscode' },
-        { title: 'Claude Code (~/.claude.json)', value: 'claudeCode' },
-        { title: 'Claude Desktop (~/.claude-desktop/config.json)', value: 'claudeDesktop' }
+        { title: 'Claude Code (~/.claude.json)', value: 'claudeCode' }
       ],
       min: 1
     }
@@ -159,7 +144,6 @@ async function main() {
   console.log('3. Test the configuration:');
   console.log('   - VSCode/Cursor: Check MCP status in your IDE');
   console.log('   - Claude Code: Use /mcp command to verify');
-  console.log('   - Claude Desktop: Check settings for MCP servers');
   console.log('');
 }
 
