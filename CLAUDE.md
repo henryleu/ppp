@@ -47,7 +47,7 @@ Key details:
 When `ppp init` is run, it creates:
 ```
 .ppp/
-├── config.json     # Project configuration
+├── settings.json   # Project configuration
 ├── README.md       # Project overview
 ├── TRACK.md        # Task tracking
 ├── SPEC.md         # Project specifications
@@ -86,19 +86,79 @@ src/
 
 ### MCP Server Features
 - **Tools**: `ppp_init`, `ppp_status` - CLI command integration
-- **Resources**: Read `.ppp/` files (config.json, SPEC.md, TRACK.md, IMPL.md)
+- **Resources**: Read `.ppp/` files (settings.json, SPEC.md, TRACK.md, IMPL.md)
 - **Prompts**: `project_init`, `project_review` - Common workflow templates
 
-### Configuration Files
-- `.cursor/mcp.json` - Cursor IDE configuration (uses `bun run`)
-- `claude-desktop-config.json` - Claude Desktop configuration example (uses `bun run`)
+### Supported IDEs and Configurations
+
+#### VSCode and VSCode-based IDEs (Cursor, Trae, Cline)
+Create `.vscode/mcp.json` in your workspace:
+```json
+{
+  "servers": {
+    "ppp": {
+      "type": "stdio",
+      "command": "ppp",
+      "args": ["--mcp-server"],
+      "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
+    }
+  }
+}
+```
+
+#### Claude Code
+Add to your `~/.claude.json` file:
+```json
+{
+  "mcpServers": {
+    "ppp": {
+      "type": "stdio",
+      "command": "ppp",
+      "args": ["--mcp-server"],
+      "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
+    }
+  }
+}
+```
+
+#### Claude Desktop
+Add to your Claude Desktop configuration:
+```json
+{
+  "mcpServers": {
+    "ppp": {
+      "type": "stdio",
+      "command": "ppp",
+      "args": ["--mcp-server"],
+      "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
+    }
+  }
+}
+```
+
+### Setup Instructions
+
+#### For End Users (Production)
+1. **Install PPP globally**: `npm install -g @ppp/cli`
+2. **Run the setup command**: `ppp setup-mcp`
+3. **Select your IDE(s)** from the interactive menu
+4. **Restart your IDE** to load the MCP server
+5. **Verify installation**: Use `/mcp` command (Claude Code) or check MCP status in your IDE
+
+#### For Developers (Local Development)
+1. **Clone the repository** and run `bun install`
+2. **Build the project**: `bun run build`
+3. **Use the development configurations**:
+   - The included `.vscode/mcp.json` and `.cursor/mcp.json` use local build commands
+   - These point to `bun run dist/index.js --mcp-server` for local development
+4. **Test the MCP server**: `bun run dist/index.js --mcp-server`
 
 ### Usage
 ```bash
-# Start MCP server mode
-bun run dist/index.js --mcp-server
+# Start MCP server mode manually
+ppp --mcp-server
 
-# Or use in AI tools via configuration
+# Or use through your configured IDE
 ```
 
 ### Requirements

@@ -36,25 +36,25 @@ export async function initCommand() {
 
   try {
     await mkdir('.ppp', { recursive: true });
-    
-    const config = {
+
+    const settings = {
       name: response.projectName,
       description: response.description,
       created: new Date().toISOString(),
       version: '1.0.0'
     };
 
-    await writeFile('.ppp/config.json', JSON.stringify(config, null, 2));
-    
+    await writeFile('.ppp/settings.json', JSON.stringify(settings, null, 2));
+
     const readmeContent = `# ${response.projectName}\n\n${response.description}\n\nThis project is managed by ppp (Product Prompt Planner).\n`;
     await writeFile('.ppp/README.md', readmeContent);
-    
+
     const trackContent = `# TRACK.md\n\n## Project Tracking\n\n- Created: ${new Date().toLocaleDateString()}\n- Status: Active\n\n## Tasks\n\n- [ ] Initial setup\n`;
     await writeFile('.ppp/TRACK.md', trackContent);
-    
+
     const specContent = `# SPEC.md\n\n## Project Specification\n\n### Overview\n${response.description}\n\n### Requirements\n\n- TBD\n\n### Technical Specifications\n\n- TBD\n`;
     await writeFile('.ppp/SPEC.md', specContent);
-    
+
     const implContent = `# IMPL.md\n\n## Implementation Notes\n\n### Architecture\n\n- TBD\n\n### Development Notes\n\n- TBD\n`;
     await writeFile('.ppp/IMPL.md', implContent);
 
@@ -64,7 +64,7 @@ export async function initCommand() {
     });
 
     table.push(
-      ['.ppp/config.json', '✅ Created'],
+      ['.ppp/settings.json', '✅ Created'],
       ['.ppp/README.md', '✅ Created'],
       ['.ppp/TRACK.md', '✅ Created'],
       ['.ppp/SPEC.md', '✅ Created'],

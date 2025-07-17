@@ -44,6 +44,24 @@ if (process.argv.includes('--mcp-server')) {
       // TODO: Implement ppp generate functionality
     });
 
+  program
+    .command('setup-mcp')
+    .description('Setup MCP configuration for your IDE')
+    .action(async () => {
+      const { spawn } = await import('child_process');
+      const { join, dirname } = await import('path');
+      const { fileURLToPath } = await import('url');
+      
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      const scriptPath = join(__dirname, '..', 'scripts', 'setup-mcp.js');
+      
+      spawn('node', [scriptPath], { 
+        stdio: 'inherit',
+        shell: true
+      });
+    });
+
   // Check for first run before parsing commands
   const checkFirstRun = async () => {
     if (await isFirstRun()) {

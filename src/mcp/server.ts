@@ -84,7 +84,7 @@ export async function startMCPServer() {
             content: [
               {
                 type: "text",
-                text: `Successfully initialized ppp project "${projectName}"\n\nFiles created:\n- .ppp/config.json\n- .ppp/README.md\n- .ppp/TRACK.md\n- .ppp/SPEC.md\n- .ppp/IMPL.md`
+                text: `Successfully initialized ppp project "${projectName}"\n\nFiles created:\n- .ppp/settings.json\n- .ppp/README.md\n- .ppp/TRACK.md\n- .ppp/SPEC.md\n- .ppp/IMPL.md`
               }
             ]
           };
@@ -230,7 +230,7 @@ export async function startMCPServer() {
               role: "user", 
               content: {
                 type: "text",
-                text: "Please review the current ppp project status. Use the ppp_status tool to check the project structure, then read the key files like config.json, SPEC.md, and TRACK.md to provide a comprehensive overview."
+                text: "Please review the current ppp project status. Use the ppp_status tool to check the project structure, then read the key files like settings.json, SPEC.md, and TRACK.md to provide a comprehensive overview."
               }
             }
           ]

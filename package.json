@@ -7,7 +7,7 @@
     "ppp": "dist/index.js"
   },
   "scripts": {
-    "build": "bun build --target=node ./src/index.ts --outfile=dist/index.js && bun build --target=node ./src/post-install.ts --outfile=dist/post-install.js && mkdir -p dist/templates/user-ppp && cp -r src/templates/user-ppp/* dist/templates/user-ppp/",
+    "build": "bun build --target=node ./src/index.ts --outfile=dist/index.js && bun build --target=node ./src/post-install.ts --outfile=dist/post-install.js && mkdir -p dist/templates/user-ppp && cp -r src/templates/user-ppp/* dist/templates/user-ppp/ && mkdir -p dist/scripts && cp -r scripts/* dist/scripts/",
     "dev": "bun --watch src/index.ts",
     "dev:help": "bun --watch src/index.ts -- --help",
     "dev:init": "bun --watch src/index.ts -- init",
