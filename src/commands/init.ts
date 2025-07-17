@@ -4,7 +4,7 @@ import prompts from 'prompts';
 import { createTable } from '../utils/table.js';
 
 export async function initCommand() {
-  console.log('🚀 Initializing ppp in current directory...\n');
+  console.log('>>> Initializing ppp in current directory...\n');
 
   const questions = [
     {
@@ -30,7 +30,7 @@ export async function initCommand() {
   const response = await prompts(questions);
 
   if (!response.projectName) {
-    console.log('❌ Initialization cancelled');
+    console.log('[ERROR] Initialization cancelled');
     return;
   }
 
@@ -60,26 +60,26 @@ export async function initCommand() {
 
     const table = createTable({
       head: ['File', 'Status'],
-      colWidths: [25, 12]
+      colWidths: [25, 15]
     });
 
     table.push(
-      ['.ppp/settings.json', '✅ Created'],
-      ['.ppp/README.md', '✅ Created'],
-      ['.ppp/TRACK.md', '✅ Created'],
-      ['.ppp/SPEC.md', '✅ Created'],
-      ['.ppp/IMPL.md', '✅ Created']
+      ['.ppp/settings.json', '[OK] Created'],
+      ['.ppp/README.md', '[OK] Created'],
+      ['.ppp/TRACK.md', '[OK] Created'],
+      ['.ppp/SPEC.md', '[OK] Created'],
+      ['.ppp/IMPL.md', '[OK] Created']
     );
 
-    console.log('\n✅ ppp initialized successfully!\n');
+    console.log('\n[OK] ppp initialized successfully!\n');
     console.log(table.toString());
-    console.log('\n💡 Next steps:');
+    console.log('\n[INFO] Next steps:');
     console.log('  - Edit .ppp/SPEC.md to define your project requirements');
     console.log('  - Use .ppp/TRACK.md to track your progress');
     console.log('  - Document implementation details in .ppp/IMPL.md');
 
   } catch (error) {
-    console.error('❌ Error initializing ppp:', error);
+    console.error('[ERROR] Error initializing ppp:', error);
     process.exit(1);
   }
 }

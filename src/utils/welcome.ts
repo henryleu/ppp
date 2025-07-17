@@ -1,19 +1,19 @@
 import prompts from 'prompts';
-import Table from 'cli-table3';
+import { createTable } from './table.js';
 import { loadSettings, saveSettings, setFirstRunComplete, getUserPppPath } from './settings.js';
 
 export async function showWelcomeMessage(): Promise<void> {
   console.log('');
-  console.log('🎉 Welcome to PPP (Product Prompt Planner)!');
+  console.log('[WELCOME] Welcome to PPP (Product Prompt Planner)!');
   console.log('');
   console.log('PPP is your AI-assisted command-line tool for managing');
   console.log('product backlogs, tasks, and bugs with structured markdown files.');
   console.log('');
-  console.log('🏠 Your personal PPP configuration is located at:');
+  console.log('[INFO] Your personal PPP configuration is located at:');
   console.log(`   ${getUserPppPath()}`);
   console.log('');
   
-  const table = new Table({
+  const table = createTable({
     head: ['File', 'Purpose'],
     colWidths: [20, 50]
   });
@@ -31,7 +31,7 @@ export async function showWelcomeMessage(): Promise<void> {
 }
 
 export async function runFirstTimeSetup(): Promise<void> {
-  console.log('🔧 Let\'s configure your PPP preferences:');
+  console.log('[SETUP] Let\'s configure your PPP preferences:');
   console.log('');
 
   const questions = [
@@ -72,7 +72,7 @@ export async function runFirstTimeSetup(): Promise<void> {
   // If user cancelled, use defaults
   if (!response.defaultProjectPath) {
     console.log('');
-    console.log('⚠️  Setup cancelled. Using default settings.');
+    console.log('[WARNING] Setup cancelled. Using default settings.');
     console.log('   You can change these later by editing ~/.ppp/settings.json');
     console.log('');
     await setFirstRunComplete();
@@ -92,14 +92,14 @@ export async function runFirstTimeSetup(): Promise<void> {
   }
 
   console.log('');
-  console.log('✅ PPP configuration complete!');
+  console.log('[OK] PPP configuration complete!');
   console.log('');
-  console.log('💡 Quick start:');
+  console.log('[INFO] Quick start:');
   console.log('   • Run "ppp init" in a project directory to initialize PPP');
   console.log('   • Run "ppp --help" to see all available commands');
   console.log('   • Check ~/.ppp/README.md for detailed usage instructions');
   console.log('');
-  console.log('🤖 For AI integration:');
+  console.log('[AI] For AI integration:');
   console.log('   • Run "ppp --mcp-server" to start MCP server mode');
   console.log('   • Configure your AI assistant to use PPP via MCP');
   console.log('');

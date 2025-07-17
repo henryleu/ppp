@@ -1,6 +1,6 @@
 {
   "name": "@ppp/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI-assisted markdown files",
   "main": "dist/index.js",
   "bin": {

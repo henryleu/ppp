@@ -60,7 +60,7 @@ async function createUserPppDirectory(): Promise<void> {
   const templateDir = join(__dirname, 'templates', 'user-ppp');
   
   try {
-    console.log('🏠 Setting up PPP user directory...');
+    console.log('[SETUP] Setting up PPP user directory...');
     
     // Create ~/.ppp directory if it doesn't exist
     if (!(await fileExists(userPppDir))) {
@@ -111,23 +111,23 @@ async function createUserPppDirectory(): Promise<void> {
     }
 
     console.log('');
-    console.log('✅ PPP user directory setup complete!');
-    console.log(`📁 Your PPP configuration is in: ${userPppDir}`);
+    console.log('[OK] PPP user directory setup complete!');
+    console.log(`[INFO] Your PPP configuration is in: ${userPppDir}`);
     console.log('');
-    console.log('💡 Next steps:');
+    console.log('[INFO] Next steps:');
     console.log('  - Run "ppp --help" to see available commands');
     console.log('  - Run "ppp init" in a project directory to get started');
     console.log('  - Check ~/.ppp/README.md for detailed usage instructions');
     console.log('');
 
   } catch (error) {
-    console.error('❌ Error setting up PPP user directory:', error);
+    console.error('[ERROR] Error setting up PPP user directory:', error);
     process.exit(1);
   }
 }
 
 // Run the post-install setup
 createUserPppDirectory().catch((error) => {
-  console.error('❌ Post-install setup failed:', error);
+  console.error('[ERROR] Post-install setup failed:', error);
   process.exit(1);
 });
