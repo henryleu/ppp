@@ -40,3 +40,5 @@ ppp is command line tool which is used to manage and track product blacklog, tas
 - ppp will create a .ppp/IMPL.md file in current directory
 
 ### ppp generate
+
+### ppp generate
