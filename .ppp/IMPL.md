@@ -81,7 +81,7 @@
 
 **Recommendation**: Option A - prevents orphaned issues, maintains hierarchy
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: A
 
 ---
 
@@ -98,7 +98,7 @@
 
 **Recommendation**: Option A - simpler to implement, easier to test
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: A
 
 ---
 
@@ -113,7 +113,7 @@
 
 **Recommendation**: Option A - flexibility for backlog management
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: A
 
 ---
 
@@ -128,7 +128,7 @@
 
 **Recommendation**: Option A - always up-to-date, no manual maintenance
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: A
 
 ---
 
@@ -143,7 +143,7 @@
 
 **Recommendation**: Option A - comprehensive, consistent structure
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: A
 
 ---
 
@@ -165,7 +165,7 @@
 
 **Recommendation**: Option D - robust error handling with user-friendly recovery
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: D
 
 ---
 
@@ -180,7 +180,7 @@
 
 **Recommendation**: Option A + C - clear workflow, simple state management
 
-**Your Decision**: [TO BE FILLED]
+**Your Decision**: A + C
 
 ---
 

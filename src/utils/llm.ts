@@ -52,7 +52,26 @@ export function sanitizeKeywords(keywords: string): string {
 }
 
 /**
- * Generate issue name keywords using LLM
+ * Count meaningful words in issue name (excluding common words)
+ */
+function countMeaningfulWords(issueName: string): number {
+  const commonWords = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it',
+    'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with', 'create', 'add', 'implement',
+    'make', 'build', 'develop', 'setup', 'set', 'up', 'new', 'fix', 'update', 'modify', 'change'
+  ]);
+
+  const words = issueName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ') // Replace non-alphanumeric with spaces
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !commonWords.has(word));
+
+  return words.length;
+}
+
+/**
+ * Generate issue name keywords using LLM for long names, direct processing for short names
  */
 export async function generateIssueNameKeywords(
   issueName: string,
@@ -62,6 +81,15 @@ export async function generateIssueNameKeywords(
     throw new Error('Issue name cannot be empty');
   }
 
+  // Count meaningful words to decide if LLM is needed
+  const meaningfulWords = countMeaningfulWords(issueName);
+  
+  // For short names (1-3 meaningful words), use direct processing
+  if (meaningfulWords <= 3) {
+    return generateFallbackKeywords(issueName);
+  }
+
+  // For long names (4+ meaningful words), use LLM to shorten
   try {
     const config = await loadLLMConfig(useGlobal);
     
@@ -71,19 +99,19 @@ export async function generateIssueNameKeywords(
 
     const client = createLLMClient(config);
 
-    const prompt = `Generate 2-4 short, descriptive keywords from this issue name for use in file/folder naming.
+    const prompt = `Shorten this long issue name to 2-4 key technical keywords for file/folder naming.
 
 Requirements:
-- Focus on key technical/functional concepts
+- Extract the most important technical/functional concepts
 - Use lowercase words only
 - Separate with spaces (will be converted to underscores)
 - Keep total length under 40 characters
-- Be concise but descriptive
-- Avoid redundant words like "create", "add", "implement" unless essential
+- Preserve core meaning while reducing length
+- Avoid redundant words like "create", "add", "implement", "system" unless essential
 
-Issue name: "${issueName}"
+Long issue name: "${issueName}"
 
-Keywords:`;
+Shortened keywords:`;
 
     const result = await generateText({
       model: client(config.model),
@@ -122,10 +150,14 @@ export function generateFallbackKeywords(issueName: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ') // Replace non-alphanumeric with spaces
     .split(/\s+/)
-    .filter(word => word.length > 2 && !commonWords.has(word))
-    .slice(0, 4); // Take first 4 meaningful words
+    .filter(word => word.length > 2 && !commonWords.has(word));
 
-  const keywords = words.join(' ');
+  // For short names, keep all meaningful words (don't limit to 4)
+  // For long names, limit to 4 words
+  const meaningfulWords = words.length;
+  const finalWords = meaningfulWords <= 3 ? words : words.slice(0, 4);
+
+  const keywords = finalWords.join(' ');
   return sanitizeKeywords(keywords);
 }
 

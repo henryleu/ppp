@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { initCommand } from './commands/init.js';
 import { createConfigCommand } from './commands/config.js';
 import { createKeywordsCommand } from './commands/keywords.js';
+import { createIssueCommand } from './commands/issue.js';
 import { startMCPServer } from './mcp/server.js';
 import { isFirstRun } from './utils/settings.js';
 import { handleFirstRun } from './utils/welcome.js';
@@ -43,6 +44,9 @@ if (process.argv.includes('--mcp-server')) {
 
   // Add keywords command for LLM-powered keyword generation
   program.addCommand(createKeywordsCommand());
+
+  // Add issue command for issue management
+  program.addCommand(createIssueCommand());
 
   program
     .command('generate')
