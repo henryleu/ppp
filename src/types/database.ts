@@ -24,7 +24,7 @@ export interface IssueMetadata {
   id: string;
   name: string;
   keywords: string;
-  type: 'feature' | 'epic' | 'story' | 'task' | 'bug';
+  type: 'feature' | 'story' | 'task' | 'bug';
   status: 'new' | 'in_progress' | 'done' | 'blocked' | 'cancelled';
   priority: 'high' | 'medium' | 'low';
   assignee?: string;
@@ -163,7 +163,7 @@ export const DEFAULT_DATABASE: PPPDatabase = {
 
 // Validation helpers
 export function isValidIssueType(type: string): type is IssueMetadata['type'] {
-  return ['feature', 'epic', 'story', 'task', 'bug'].includes(type);
+  return ['feature', 'story', 'task', 'bug'].includes(type);
 }
 
 export function isValidIssueStatus(status: string): status is IssueMetadata['status'] {

@@ -52,11 +52,11 @@ This is your personal template for project specifications. Use this as a startin
 
 ## User Stories
 
-### Epic 1: [Epic Name]
+### Feature 1: [Feature Name]
 - **As a** [user type], **I want** [functionality] **so that** [benefit]
 - **As a** [user type], **I want** [functionality] **so that** [benefit]
 
-### Epic 2: [Epic Name]
+### Feature 2: [Feature Name]
 - **As a** [user type], **I want** [functionality] **so that** [benefit]
 - **As a** [user type], **I want** [functionality] **so that** [benefit]
 

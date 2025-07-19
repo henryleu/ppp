@@ -251,6 +251,35 @@ export function generateFallbackKeywords(issueName: string): string {
 }
 
 /**
+ * Truncate text to fit within a display width, accounting for Chinese characters
+ */
+export function truncateText(text: string, maxDisplayWidth: number): string {
+  if (!text) return '';
+  
+  const currentDisplayLength = getStringDisplayLength(text);
+  if (currentDisplayLength <= maxDisplayWidth) {
+    return text;
+  }
+  
+  // Need to truncate - account for "..." which takes 3 display units
+  const targetWidth = maxDisplayWidth - 3;
+  let result = '';
+  let currentWidth = 0;
+  
+  for (const char of text) {
+    const charWidth = /[\u4e00-\u9fff]/.test(char) ? 2 : 1;
+    if (currentWidth + charWidth <= targetWidth) {
+      result += char;
+      currentWidth += charWidth;
+    } else {
+      break;
+    }
+  }
+  
+  return result + '...';
+}
+
+/**
  * Test function for keyword generation
  */
 export async function testKeywordGeneration(testApiKey?: string): Promise<void> {

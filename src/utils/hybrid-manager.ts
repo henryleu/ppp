@@ -184,23 +184,40 @@ export class HybridManager {
   }
 
   /**
-   * List issues in hierarchical order with numbering
+   * List issues in hierarchical order
    */
   public async listIssuesHierarchical(rootParentId?: string, filter?: Partial<IssueCreationData & { sprintId?: string; status?: string }>): Promise<Issue[]> {
-    // Get all issues with optional filtering
-    const allIssues = await this.listIssues(filter);
+    // When rootParentId is specified, we need to show that issue + its descendants
+    // The root issue itself should always be included regardless of filter
+    let allIssues: Issue[];
+    let rootIssue: Issue | null = null;
+
+    if (rootParentId) {
+      // Get the root issue first (without any filters)
+      rootIssue = await this.getIssue(rootParentId);
+      if (!rootIssue) {
+        return []; // Root issue not found
+      }
+
+      // Get all issues without filtering, we'll filter descendants later
+      allIssues = await this.listIssues({});
+    } else {
+      // No specific root, get all issues with filtering
+      allIssues = await this.listIssues(filter);
+    }
     
-    // Build hierarchy tree
+    // Build hierarchy tree with case-insensitive mapping
     const issueMap = new Map<string, Issue>();
     const childrenMap = new Map<string, Issue[]>();
     
-    // Create maps for quick lookup
+    // Create maps for quick lookup with case-insensitive keys
     allIssues.forEach(issue => {
-      issueMap.set(issue.id, issue);
-      if (!childrenMap.has(issue.parentId || 'root')) {
-        childrenMap.set(issue.parentId || 'root', []);
+      issueMap.set(issue.id.toUpperCase(), issue);
+      const parentKey = issue.parentId ? issue.parentId.toUpperCase() : 'root';
+      if (!childrenMap.has(parentKey)) {
+        childrenMap.set(parentKey, []);
       }
-      childrenMap.get(issue.parentId || 'root')!.push(issue);
+      childrenMap.get(parentKey)!.push(issue);
     });
     
     // Sort children by ID for consistent ordering
@@ -208,36 +225,65 @@ export class HybridManager {
       children.sort((a, b) => a.id.localeCompare(b.id));
     });
     
+    // Helper function to check if an issue matches the filter
+    const matchesFilter = (issue: Issue): boolean => {
+      if (!filter) return true;
+      if (filter.type && issue.type !== filter.type) return false;
+      if ((filter as any).status && issue.status !== (filter as any).status) return false;
+      if (filter.assignee && issue.assignee !== filter.assignee) return false;
+      if ((filter as any).sprintId && issue.sprintId !== (filter as any).sprintId) return false;
+      if (filter.labels && filter.labels.length > 0) {
+        const hasMatchingLabel = filter.labels.some(label => 
+          issue.labels.some(issueLabel => 
+            issueLabel.toLowerCase().includes(label.toLowerCase())
+          )
+        );
+        if (!hasMatchingLabel) return false;
+      }
+      return true;
+    };
+    
     // Traverse hierarchy depth-first to build ordered list
     const result: Issue[] = [];
     
-    const traverse = (parentId: string | null) => {
-      const children = childrenMap.get(parentId || 'root') || [];
+    const traverse = (parentId: string | null, includeParent: boolean = false) => {
+      // If includeParent is true and we have a parent issue, add it first
+      if (includeParent && parentId) {
+        const parentIssue = issueMap.get(parentId.toUpperCase());
+        if (parentIssue) {
+          result.push(parentIssue);
+        }
+      }
+
+      // Get children using case-insensitive lookup
+      const parentKey = parentId ? parentId.toUpperCase() : 'root';
+      const children = childrenMap.get(parentKey) || [];
       
       children.forEach((child) => {
-        // Add issue without numbering - just maintain hierarchical order
-        result.push(child);
+        // Apply filter to descendants (but not to root issue if specified)
+        const isRootIssue = rootIssue && child.id.toUpperCase() === rootIssue.id.toUpperCase();
+        const childMatchesFilter = isRootIssue || matchesFilter(child);
+
+        // Add child issue if it matches filter
+        if (childMatchesFilter) {
+          result.push(child);
+        }
         
-        // Recursively add children
-        traverse(child.id);
+        // Always traverse children to find matching descendants,
+        // even if this child doesn't match the filter
+        traverse(child.id, false);
       });
     };
     
     // Start traversal from the specified root or from all root issues
-    if (rootParentId) {
-      // Find root issue case-insensitively
-      const rootIssue = Array.from(issueMap.values()).find(issue => 
-        issue.id.toUpperCase() === rootParentId.toUpperCase()
-      );
-      if (rootIssue) {
-        // Add the root issue itself first (without numbering since it's the starting point)
-        result.push(rootIssue);
-        // Then add its children in hierarchical order
-        traverse(rootIssue.id);
-      }
+    if (rootParentId && rootIssue) {
+      // Add the root issue first (always included regardless of filter)
+      result.push(rootIssue);
+      // Then add its descendants (with filtering applied)
+      traverse(rootIssue.id, false);
     } else {
       // Start from all root issues (no parent)
-      traverse(null);
+      traverse(null, false);
     }
     
     return result;

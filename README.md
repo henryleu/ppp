@@ -4,7 +4,7 @@ ppp (Product Prompt Planner) is command line tool which is used to manage featur
 
 **Key Features:**
 - **Hierarchical Issue Management**: 3-layer feature structure with tasks and bugs
-- **Robust Folder System**: Finds folders by ID prefix, resilient to manual renames  
+- **Robust Folder System**: Finds folders by ID prefix, resilient to manual renames
 - **Unicode Support**: Full support for Chinese and international characters
 - **Sprint Management**: Complete sprint lifecycle with issue tracking
 - **Database Integration**: YAML metadata with markdown content files
@@ -23,11 +23,11 @@ All PPP features are built on top of following building blocks:
 - llm_api_top_p: 1
 
 ### Issue
-**Issue** is the abstraction of any work item in the product backlog. It can be a module/feature, a task, a bug, an epic, a user story, etc. All the detailed information about an issue is in its **Issue File** which is in the issue's parent folder, or in a **Issue Container Folder** which is in the issue's parent folder. Whether or not being in the **Issue Container Folder** depends on the issue type.
+**Issue** is the abstraction of any work item in the product backlog. It can be a module/feature, a task, a bug, a story, etc. All the detailed information about an issue is in its **Issue File** which is in the issue's parent folder, or in a **Issue Container Folder** which is in the issue's parent folder. Whether or not being in the **Issue Container Folder** depends on the issue type.
 
 1. **Issue Attributes**
 - **Issue ID**: Unique identifier for the issue.
-- **Issue Type**: Module/Feature, Epic, User Story, Task, Bug, etc.
+- **Issue Type**: Module/Feature, User Story, Task, Bug, etc.
 - **Issue Status**: New, In Progress, Done, etc.
 - **Issue Priority**: High, Medium, Low, etc.
 - **Issue Assignee**: Person responsible for the issue.
@@ -40,7 +40,7 @@ All PPP features are built on top of following building blocks:
 
   - **Prefix Char Meaning** These prefix characters are used to categorize the issue type by ppp and devs. As of now, they are fixed and maybe configurable in future. In terms of an issue's type, the issue ID is prefixed with following characters:
     - **Feature**: F
-    - **Epic/User Story/Task**: T
+    - **User Story/Task**: T
     - **Bug**: B
 
   - **Rules of Issue ID Generation**
@@ -53,9 +53,9 @@ All PPP features are built on top of following building blocks:
       - layer 2 feature IDs gos with prefix plus 4-fixed-digits like F0101, F0101, .. F0199, F1201, F1202, ...F1299. The F prefix means feature, the first 2 digits is an internal ID part that means it is under the layer 1 features (the top-level feature), the last 2 digits is an internal ID part in it parent feature (layer 1 feature).
       - layer 3 feature IDs gos with prefix plus 6-fixed-digits like F010101, F010102, ...F010199, F010105, F120201. The F prefix means feature, the first 2 digits means it is under a specifc layer 1 feature, the second 2-digits is an internal ID part that means it is under a specific layer 2 feature, the last 2 digits is an internal ID part in its parent layer 2 feature.
 
-    3. **Epic/User Story/Task ID**: The type of issues must be put under a specific feature doc folder and ID must be prefixed with a specific feature ID's digits part, and also be suffixed with an auto-incremented 2-digits number. i.e. if a user story belongs to a feature F0105, The user story ID goes like T010501, "0105" mean the user story belongs to feature F0105. if a user story belongs to feature F01, The user story ID goes like T0101, "01" mean the user story belongs to feature F01.
+    3. **User Story/Task ID**: The type of issues must be put under a specific feature doc folder and ID must be prefixed with a specific feature ID's digits part, and also be suffixed with an auto-incremented 2-digits number. i.e. if a user story belongs to a feature F0105, The user story ID goes like T010501, "0105" mean the user story belongs to feature F0105. if a user story belongs to feature F01, The user story ID goes like T0101, "01" mean the user story belongs to feature F01.
 
-    4. **Bug ID**: Bugs must be put under a specific feature doc folder and ID must be prefixed with a specific feature/Epic/User Story/Task ID's digits part, and also be suffixed with an auto-incremented 2-digits number as what Epic/User Story/Task ID does. i.e. if a bug belongs to a feature F0105, The bug ID goes like B010501, "0105" mean the bug belongs to feature B0105. if a bug belongs to feature T010101, The bug ID goes like B010101, "01" mean the bug belongs to feature F0101.
+    4. **Bug ID**: Bugs must be put under a specific feature doc folder and ID must be prefixed with a specific feature/User Story/Task ID's digits part, and also be suffixed with an auto-incremented 2-digits number as what User Story/Task ID does. i.e. if a bug belongs to a feature F0105, The bug ID goes like B010501, "0105" mean the bug belongs to feature B0105. if a bug belongs to feature T010101, The bug ID goes like B010101, "01" mean the bug belongs to feature F0101.
 
   - **ID Generation System**: PPP uses a counter-based ID generation system that maintains auto-incrementing counters for each issue type and hierarchy level. The counters are stored in the `.ppp/database.yml` file and are automatically updated when new issues are created. This ensures unique IDs and prevents conflicts even when issues are created concurrently or when the file system is modified externally.
 
@@ -63,7 +63,7 @@ All PPP features are built on top of following building blocks:
 
   - **Issue ID Matching**: PPP uses case-insensitive matching when searching for or referencing issue IDs. This means that `f01`, `F01`, and `F01` are all treated as the same issue ID. Users can use lowercase, uppercase, or mixed case when specifying issue IDs in commands, and PPP will automatically find the correct issue. For example:
     - `ppp issue update f01 "New Name"` (lowercase)
-    - `ppp issue update F01 "New Name"` (uppercase)  
+    - `ppp issue update F01 "New Name"` (uppercase)
     - `ppp sprint add f01 01` (lowercase issue ID)
     - `ppp sprint add F01 01` (uppercase issue ID)
     All of these commands will work with the same issue `F01`.
@@ -75,7 +75,7 @@ All PPP features are built on top of following building blocks:
 
 4. **Issue File** is the file that contains all the issue related info. It is created when issue is created and managed by ppp during issue lifetime. **All issues create folders** for extensibility and consistency.
 - Features: Its path is like `.ppp/<issue_container_folder>/spec.md`. i.e. `F01-admin/spec.md`, `F01-admin/F02-user_management/spec.md`, etc. It should includes all the issue attributes and other details of requrment and implemation in the md file.
-- Epics/User Stories/Tasks: Its path is like `.ppp/<feature_folder>/<feature_folder>/<task_folder>/spec.md`. i.e. `F01-admin/T01-create_admin_ddl/spec.md`, `F01-admin/F01-user_management/T03-add_user/spec.md` and `F01-admin/F01-user_management/F02-add_user/T05-check_username/spec.md`. It should includes all the issue attributes and other details related the issue type in the md file.
+- User Stories/Tasks: Its path is like `.ppp/<feature_folder>/<feature_folder>/<task_folder>/spec.md`. i.e. `F01-admin/T01-create_admin_ddl/spec.md`, `F01-admin/F01-user_management/T03-add_user/spec.md` and `F01-admin/F01-user_management/F02-add_user/T05-check_username/spec.md`. It should includes all the issue attributes and other details related the issue type in the md file.
 - Bugs: Its path is like `.ppp/<feature_folder>/<feature_or_task_folder>/<bug_folder>/spec.md`. i.e. `F01-admin/F01-user_management/B03-cannot_load_feature_page/spec.md` and `F01-admin/F01-user_management/F02-add_user/B05-fail_to_submit/spec.md`. It should includes all the issue attributes and bug details in the md file.
 
 5. **Issue Container Folder** is the feature folder that contains all the child issues related to the feature. It is created when feature is created and managed by ppp during feature lifetime. Its path is like `.ppp/<issue_container_folder>`. i.e. `F01_admin`, `F01_admin/F02_user_management`, etc.
@@ -116,7 +116,7 @@ The Feature Bill enables teams to:
 - Visualize the full hierarchy of the product’s features.
 - Quickly locate specific features and their associated details (e.g., status, assignee, description).
 - Understand parent-child relationships between nested layers (e.g., which Layer 2 features belong to a Layer 1 feature).
-- Serve as a navigation hub linking to detailed `spec.md` files for each module/feature, and indirectly to related epics, user stories, tasks, or bugs nested within their folders.
+- Serve as a navigation hub linking to detailed `spec.md` files for each module/feature, and indirectly to related user stories, tasks, or bugs nested within their folders.
 
 
 #### **Hierarchical Structure**
@@ -160,7 +160,7 @@ The Feature Bill is typically maintained as a structured markdown file (e.g., `.
 
 #### **Relationship to Other Issues**
 The Feature Bill acts as a root node for all module/feature-related work, as:
-- Epics, user stories, and tasks (with IDs prefixed by `T`) are nested in the folders of their parent features (e.g., a task `T010201` lives in `.ppp/F01-<keywords>/F02-<keywords>/`).
+- User stories and tasks (with IDs prefixed by `T`) are nested in the folders of their parent features (e.g., a task `T010201` lives in `.ppp/F01-<keywords>/F02-<keywords>/`).
 - Bugs (with IDs prefixed by `B`) are similarly nested under their associated features or tasks.
 
 Thus, the Feature Bill provides a clear starting point to trace from high-level modules down to granular tasks or bugs, ensuring full visibility into the product’s development workflow.
@@ -185,7 +185,7 @@ All the issue related features are under `ppp issue` command.
 #### create issue
 
 ***issue create*** command creates an issue with type, parent and name provided during the command execution. And it uses `create` sub command and goes like `ppp issue create <issue_type> [<parent_issue_id>] [<issue_name>]`.
-- issue_type is requred and must be one of `feature`, `epic`, `story`, `task`, `bug`.
+- issue_type is requred and must be one of `feature`, `story`, `task`, `bug`.
 - if parent_issue_id or issue_name is not provided, it enters interactive-UI model.
   - prompt user to search and select the parent issue if any.
   - show the selected parent issue's info if any, and prompt user to input issue name.
@@ -205,11 +205,11 @@ All issues create folders for extensibility and consistency, with each folder co
     - **Layer 2 Features**:  Nested under a specific Layer 1 feature folder, named as: `F01-<issue_name_keywords>/`, `F02-<issue_name_keywords>/`, ... (e.g., A Layer 2 feature "F0102" would be stored at `.ppp/F01-<issue_name_keywords>/F02-<issue_name_keywords>/`)
     - **Layer 3 Features**: Nested under a specific Layer 2 feature folder, named as: `F01-<issue_name_keywords>/`, `F02-<issue_name_keywords>/`, ... (e.g., A Layer 3 feature "F010201" would be stored at `.ppp/F01-<issue_name_keywords>/F02-<issue_name_keywords>/F01-<issue_name_keywords>/`)
 
-  2. **Epics/User Stories/Tasks (Folders with spec.md)**
-Epics, user stories, and tasks are created as folders, nested under the corresponding feature folder, with the following naming format: `T01-<issue_name_keywords>/`, `T02-<issue_name_keywords>/`, ...
+  2. **User Stories/Tasks (Folders with spec.md)**
+User stories and tasks are created as folders, nested under the corresponding feature folder, with the following naming format: `T01-<issue_name_keywords>/`, `T02-<issue_name_keywords>/`, ...
   - Example 1: A task "T010201" would be stored at:
   `.ppp/F01-<issue_name_keywords>/F02-<issue_name_keywords>/T01-<issue_name_keywords>/spec.md`
-  - Example 2: A Epic "T020502" would be stored at:
+  - Example 2: A user story "T020502" would be stored at:
     `.ppp/F02-<issue_name_keywords>/F05-<issue_name_keywords>/T02-<issue_name_keywords>/spec.md`
   - Example 3: A Bug "B01020111" would be stored at:
   `.ppp/F01-<issue_name_keywords>/F02-<issue_name_keywords>/F01-<issue_name_keywords>/B11-<issue_name_keywords>/spec.md`
@@ -235,6 +235,68 @@ During **issue deletion**, ppp will:
 - remove the issue record in its parent's issue list if any, etc;
 - remove the issue record in Feature Bill if the deleted issue is a module/feature;
 - remove the issue record in Sprint file if the issue has been assigned to a sprint;
+
+#### list issue
+
+***issue list*** command displays issues in various formats depending on parameters provided. It supports three modes: top-level listing, hierarchical tree view, and parent-filtered view. The command uses `list` sub command and maintains proper hierarchical tree structure.
+
+**Usage:**
+- `ppp issue list` - Shows only top-level features (issues with no parent)
+- `ppp issue list [issue_id]` - Shows hierarchical tree of all descendants under specified issue
+- `ppp issue list --parent [parent_id]` - Shows direct children of specified parent only
+
+**Options:**
+- `-p, --parent <parent_id>` - Filter by parent issue ID
+- `-t, --type <type>` - Filter by issue type (feature, story, task, bug)
+- `-s, --status <status>` - Filter by issue status (new, in_progress, done, blocked, cancelled)
+- `-a, --assignee <assignee>` - Filter by assignee name
+- `--sprint <sprint_id>` - Filter by sprint ID
+
+**Key Features:**
+- **Hierarchical Tree Structure**: Maintains proper depth-first traversal order showing parent → children → grandchildren
+- **Unicode Support**: Full support for Chinese and international characters with proper display width calculation
+- **Clean Display**: Tabular format with appropriate column sizing and text truncation
+- **Filter Combinations**: All filter options work in combination across all three usage modes
+
+**Examples:**
+
+1. **Top-level listing** - Show only root features:
+```bash
+$ ppp issue list
+Top-level issues:
+F01 - Admin Dashboard
+F02 - User Management System
+F03 - Payment Gateway
+```
+
+2. **Hierarchical tree view** - Show complete hierarchy under F01:
+```bash
+$ ppp issue list F01
+Hierarchical view under F01: Admin Dashboard
+F01     - Admin Dashboard
+F0101   - User Authentication
+T010101 - Login API
+T010102 - Password Reset
+F0102   - Dashboard UI
+T010201 - Main Dashboard
+T010202 - Analytics Panel
+```
+
+3. **Parent-filtered view** - Show only direct children:
+```bash
+$ ppp issue list --parent F0101
+Issues with parent F0101:
+T010101 - Login API
+T010102 - Password Reset
+```
+
+4. **Filtered hierarchical view** - Show hierarchy with filters:
+```bash
+$ ppp issue list F01 --type task --status new
+# Shows only new tasks in F01 hierarchy
+```
+
+The hierarchical listing displays all descendants in proper tree order without numbered prefixes, making it easy to understand the complete project structure and relationships between issues.
 
 ### **Sprint** Features
 All the sprint related features are under `ppp sprint` command.

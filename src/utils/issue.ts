@@ -41,7 +41,7 @@ export class IssueManager {
       if (parentLevel >= 3) {
         throw new Error(`Maximum feature nesting level (3) exceeded. Cannot create child of ${parent.id}`);
       }
-    } else if (childType === IssueType.EPIC || childType === IssueType.STORY || childType === IssueType.TASK) {
+    } else if (childType === IssueType.STORY || childType === IssueType.TASK) {
       // Tasks can be children of features or other tasks
       if (parentPrefix !== 'F' && parentPrefix !== 'T') {
         throw new Error(`Tasks can only be children of features or other tasks, not ${parent.type}`);

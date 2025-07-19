@@ -42,3 +42,5 @@ ppp is command line tool which is used to manage and track product blacklog, tas
 ### ppp generate
 
 ### ppp generate
+
+export HTTPS_PROXY=http://127.0.0.1:7897
