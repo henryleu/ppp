@@ -1,5 +1,5 @@
-import { mkdir, writeFile, readFile, rename, stat } from 'fs/promises';
-import { join, dirname } from 'path';
+import { mkdir, writeFile, readFile, rename } from 'fs/promises';
+import { join } from 'path';
 import { fileExists } from './settings.js';
 import { Issue, IssueType, IssueStatus, IssuePriority } from '../types/issue.js';
 import { Sprint } from '../types/sprint.js';
@@ -36,31 +36,95 @@ export class FileManager {
     await mkdir(archivePath, { recursive: true });
   }
   
+  public extractLevelFolderName(id: string, level: number): string {
+    // Extract the level-specific folder name from issue ID
+    // Level 1: F01 → F01, F0102 → F01, F010203 → F01  
+    // Level 2: F0102 → F02, F010203 → F02
+    // Level 3: F010203 → F03
+    
+    const prefix = id.charAt(0); // 'F', 'T', or 'B'
+    const digits = id.substring(1); // Remove prefix
+    
+    if (level === 1) {
+      // Level 1: First 2 digits (01 from F01, F0102, F010203)
+      return `${prefix}${digits.substring(0, 2)}`;
+    } else if (level === 2) {
+      // Level 2: Digits 3-4 (02 from F0102, F010203)
+      return `${prefix}${digits.substring(2, 4)}`;
+    } else if (level === 3) {
+      // Level 3: Digits 5-6 (03 from F010203)
+      return `${prefix}${digits.substring(4, 6)}`;
+    }
+    
+    return id; // Fallback
+  }
+
+  public getIssueLevel(id: string): number {
+    // Determine the level based on ID length
+    const digits = id.substring(1); // Remove prefix
+    const digitCount = digits.length;
+    
+    if (digitCount === 2) return 1; // F01
+    if (digitCount === 4) return 2; // F0103
+    if (digitCount === 6) return 3; // F010203
+    
+    return 1; // Default to level 1
+  }
+
   public generateFolderName(id: string, keywords: string): string {
-    // Keywords are already sanitized by sanitizeKeywords() in llm.ts
-    // Just combine ID and keywords with hyphen separator
-    return `${id}-${keywords}`;
+    const level = this.getIssueLevel(id);
+    const levelName = this.extractLevelFolderName(id, level);
+    return `${levelName}-${keywords}`;
   }
   
   public async generateIssueFolderPath(issue: Issue): Promise<string> {
-    const folderName = this.generateFolderName(issue.id, issue.keywords);
+    const level = this.getIssueLevel(issue.id);
     
     if (issue.parentId) {
-      // Child issue - nest under parent
+      // Child issue - nest under parent folder
+      const folderName = this.generateFolderName(issue.id, issue.keywords);
       const parentFolderPath = await this.getIssueFolderPath(issue.parentId);
       if (!parentFolderPath) {
         throw new Error(`Parent folder not found for issue ${issue.parentId}`);
       }
       return join(parentFolderPath, folderName);
     } else {
-      // Top-level issue - directly under .ppp
-      return join(this.getPppPath(), folderName);
+      // Top-level issue - build hierarchical path based on ID structure
+      const pathParts: string[] = [];
+      
+      // For features, build the nested path by finding parent folders
+      for (let i = 1; i <= level; i++) {
+        const levelName = this.extractLevelFolderName(issue.id, i);
+        
+        if (i === level) {
+          // Final level: use actual keywords
+          pathParts.push(`${levelName}-${issue.keywords}`);
+        } else {
+          // Parent levels: find existing parent folder or use placeholder
+          const parentId = this.extractLevelFolderName(issue.id, i);
+          const existingParentPath = await this.getIssueFolderPath(parentId);
+          
+          if (existingParentPath) {
+            // Use the actual parent folder name from existing structure
+            const folderName = existingParentPath.split('/').pop() || `${levelName}-folder`;
+            pathParts.push(folderName);
+          } else {
+            // Fallback to generic naming - this should be rare
+            pathParts.push(`${levelName}-folder`);
+          }
+        }
+      }
+      
+      return join(this.getPppPath(), ...pathParts);
     }
   }
   
   public async getIssueFolderPath(issueId: string): Promise<string | null> {
     // Scan the directory structure recursively to find the folder matching the issue ID
     const { readdir, stat } = await import('fs/promises');
+    
+    const level = this.getIssueLevel(issueId);
+    const levelName = this.extractLevelFolderName(issueId, level);
     
     const scanDirectory = async (dirPath: string): Promise<string | null> => {
       try {
@@ -72,7 +136,8 @@ export class FileManager {
           
           if (itemStat.isDirectory()) {
             // Check if this is the issue folder we're looking for (case-insensitive)
-            if (item.toUpperCase().startsWith(`${issueId.toUpperCase()}-`)) {
+            // Use level-specific folder name instead of full issue ID
+            if (item.toUpperCase().startsWith(`${levelName.toUpperCase()}-`)) {
               return itemPath;
             }
             
@@ -109,24 +174,50 @@ export class FileManager {
   public async updateIssueFolder(issue: Issue, oldKeywords?: string): Promise<string> {
     await this.ensurePppDirectory();
     
-    const newFolderPath = await this.generateIssueFolderPath(issue);
+    // Always find the existing folder first using issue ID
+    const currentFolderPath = await this.getIssueFolderPath(issue.id);
     
-    if (oldKeywords) {
-      // Rename folder if keywords changed
-      // Find the current folder path using the issue ID
-      const currentFolderPath = await this.getIssueFolderPath(issue.id);
-      
-      if (currentFolderPath && await fileExists(currentFolderPath)) {
-        await rename(currentFolderPath, newFolderPath);
+    let newFolderPath: string;
+    try {
+      newFolderPath = await this.generateIssueFolderPath(issue);
+    } catch (error) {
+      console.warn(`Failed to generate folder path for ${issue.id}:`, error);
+      // If we have an existing folder, use it as fallback
+      if (currentFolderPath) {
+        newFolderPath = currentFolderPath;
+      } else {
+        // Create a fallback path only if no existing folder
+        const folderName = this.generateFolderName(issue.id, issue.keywords);
+        newFolderPath = join(this.getPppPath(), folderName);
       }
     }
     
+    let actualFolderPath = newFolderPath;
+    
+    // Always try to rename existing folder when we have the current path
+    if (currentFolderPath && await fileExists(currentFolderPath)) {
+      // We have an existing folder - rename it if path is different
+      if (currentFolderPath !== newFolderPath) {
+        await rename(currentFolderPath, newFolderPath);
+      }
+      actualFolderPath = newFolderPath;
+    } else if (!(await fileExists(newFolderPath))) {
+      // No existing folder and new path doesn't exist, create it
+      await mkdir(newFolderPath, { recursive: true });
+      actualFolderPath = newFolderPath;
+    }
+    
+    // Ensure the folder exists (in case it was renamed to an existing path)
+    if (!(await fileExists(actualFolderPath))) {
+      await mkdir(actualFolderPath, { recursive: true });
+    }
+    
     // Update spec.md file
-    const specPath = join(newFolderPath, 'spec.md');
+    const specPath = join(actualFolderPath, 'spec.md');
     const specContent = this.generateIssueSpecContent(issue);
     await writeFile(specPath, specContent);
     
-    return newFolderPath;
+    return actualFolderPath;
   }
   
   public async deleteIssueFolder(issueId: string): Promise<void> {
