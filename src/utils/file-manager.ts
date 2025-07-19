@@ -1,8 +1,9 @@
-import { mkdir, writeFile, readFile, rename } from 'fs/promises';
+import { mkdir, writeFile, readFile, rename, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { fileExists } from './settings.js';
 import { Issue, IssueType, IssueStatus, IssuePriority } from '../types/issue.js';
 import { Sprint } from '../types/sprint.js';
+import { databaseManager } from './database.js';
 
 export interface FileManagerOptions {
   projectRoot?: string;
@@ -119,42 +120,97 @@ export class FileManager {
     }
   }
   
+  /**
+   * Find issue folder using hierarchical traversal based on parent relationships
+   * This approach is robust against manual folder renames since it uses stable issue IDs
+   */
   public async getIssueFolderPath(issueId: string): Promise<string | null> {
-    // Scan the directory structure recursively to find the folder matching the issue ID
-    const { readdir, stat } = await import('fs/promises');
-    
-    const level = this.getIssueLevel(issueId);
-    const levelName = this.extractLevelFolderName(issueId, level);
-    
-    const scanDirectory = async (dirPath: string): Promise<string | null> => {
-      try {
-        const items = await readdir(dirPath);
+    try {
+      // Build parent hierarchy chain from database
+      const parentChain = await this.buildParentChain(issueId);
+      if (parentChain.length === 0) {
+        return null; // Issue not found in database
+      }
+      
+      // Start from .ppp directory and traverse the hierarchy
+      let currentPath = this.getPppPath();
+      
+      for (const chainIssueId of parentChain) {
+        const level = this.getIssueLevel(chainIssueId);
+        const levelName = this.extractLevelFolderName(chainIssueId, level);
         
-        for (const item of items) {
-          const itemPath = join(dirPath, item);
-          const itemStat = await stat(itemPath);
-          
-          if (itemStat.isDirectory()) {
-            // Check if this is the issue folder we're looking for (case-insensitive)
-            // Use level-specific folder name instead of full issue ID
-            if (item.toUpperCase().startsWith(`${levelName.toUpperCase()}-`)) {
-              return itemPath;
-            }
-            
-            // Recursively scan subdirectories
-            const result = await scanDirectory(itemPath);
-            if (result) return result;
-          }
+        // Look for folder starting with issue ID prefix in current directory
+        const folderName = await this.findFolderByPrefix(currentPath, levelName);
+        if (!folderName) {
+          return null; // Folder not found at this level
         }
         
-        return null;
-      } catch (error) {
-        console.warn(`Failed to scan directory ${dirPath}:`, error);
-        return null;
+        currentPath = join(currentPath, folderName);
       }
-    };
+      
+      // Verify the final folder exists
+      if (await fileExists(currentPath)) {
+        return currentPath;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn(`Failed to get folder path for issue ${issueId}:`, error);
+      return null;
+    }
+  }
+  
+  /**
+   * Build the parent hierarchy chain from database using parent relationships
+   * Returns array from root to target issue (e.g., [F01, F02, T03] for T010203)
+   */
+  private async buildParentChain(issueId: string): Promise<string[]> {
+    const chain: string[] = [];
+    let currentId = issueId;
     
-    return await scanDirectory(this.getPppPath());
+    // Traverse up the parent chain
+    while (currentId) {
+      const metadata = await databaseManager.getIssue(currentId);
+      if (!metadata) {
+        break; // Issue not found
+      }
+      
+      // Extract level-specific ID for this issue
+      const level = this.getIssueLevel(currentId);
+      const levelId = this.extractLevelFolderName(currentId, level);
+      chain.unshift(levelId); // Add to beginning to build root-to-target chain
+      
+      currentId = metadata.parent_id; // Move up to parent
+    }
+    
+    return chain;
+  }
+  
+  /**
+   * Find folder in directory that starts with the given prefix
+   * Returns the actual folder name, not the full path
+   */
+  private async findFolderByPrefix(dirPath: string, prefix: string): Promise<string | null> {
+    try {
+      const items = await readdir(dirPath);
+      
+      for (const item of items) {
+        const itemPath = join(dirPath, item);
+        const itemStat = await stat(itemPath);
+        
+        if (itemStat.isDirectory()) {
+          // Case-insensitive prefix matching
+          if (item.toUpperCase().startsWith(`${prefix.toUpperCase()}-`)) {
+            return item;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn(`Failed to scan directory ${dirPath}:`, error);
+      return null;
+    }
   }
   
   public async createIssueFolder(issue: Issue): Promise<string> {

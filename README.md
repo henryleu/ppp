@@ -2,6 +2,14 @@
 
 ppp (Product Prompt Planner) is command line tool which is used to manage features and track product blacklog, tasks and bugs using well-structured folders and well-documented markdown files for ai assist tools like cursor , trae or claude code.
 
+**Key Features:**
+- **Hierarchical Issue Management**: 3-layer feature structure with tasks and bugs
+- **Robust Folder System**: Finds folders by ID prefix, resilient to manual renames  
+- **Unicode Support**: Full support for Chinese and international characters
+- **Sprint Management**: Complete sprint lifecycle with issue tracking
+- **Database Integration**: YAML metadata with markdown content files
+- **AI Integration**: MCP server for seamless AI assistant workflows
+
 ## Building Blocks
 All PPP features are built on top of following building blocks:
 
@@ -51,6 +59,8 @@ All PPP features are built on top of following building blocks:
 
   - **ID Generation System**: PPP uses a counter-based ID generation system that maintains auto-incrementing counters for each issue type and hierarchy level. The counters are stored in the `.ppp/database.yml` file and are automatically updated when new issues are created. This ensures unique IDs and prevents conflicts even when issues are created concurrently or when the file system is modified externally.
 
+  - **Folder Location System**: PPP uses a robust hierarchical folder location system that never stores folder paths in the database. Instead, it dynamically computes folder locations using parent relationships and searches by issue ID prefixes. This makes the system resilient to manual folder renames - users can rename folders freely and PPP will still find them correctly.
+
   - **Issue ID Matching**: PPP uses case-insensitive matching when searching for or referencing issue IDs. This means that `f01`, `F01`, and `F01` are all treated as the same issue ID. Users can use lowercase, uppercase, or mixed case when specifying issue IDs in commands, and PPP will automatically find the correct issue. For example:
     - `ppp issue update f01 "New Name"` (lowercase)
     - `ppp issue update F01 "New Name"` (uppercase)  
@@ -60,7 +70,7 @@ All PPP features are built on top of following building blocks:
 
 
 3. **Issue Name** is assigned by ppp user when issue is created. and its **Name Keywords** is genrated by ppp (which will use LLM API to genrate keywords from issue name configured by user in settings.json file in the future) and used by issue filing as file name.
-  - **Name Keywords** is a list of keywords that are generated from issue name in course of issue filing. It is used to search for issues. It is also used to generate issue link in **sprint** markdown files. It is also used to generate issue link in commit messages.
+  - **Name Keywords** is a list of keywords that are generated from issue name in course of issue filing. PPP supports Unicode characters including Chinese text with specialized processing to preserve all international characters in issue names and keywords.
   - **Issue Filing** is the course of issue creation. It includes issue file/folder name, issue file/folder content which will include issue ID, name, description, issue type, issue priority, issue assignee, issue reporter, issue labels, issue comments, etc.
 
 4. **Issue File** is the file that contains all the issue related info. It is created when issue is created and managed by ppp during issue lifetime. **All issues create folders** for extensibility and consistency.

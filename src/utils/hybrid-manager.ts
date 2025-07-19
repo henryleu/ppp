@@ -67,8 +67,8 @@ export class HybridManager {
       sprint_id: undefined,
       created_at: now,
       updated_at: now,
-      children: [],
-      folder_path: fileManager.generateFolderName(id, keywords)
+      children: []
+      // folder_path removed - computed dynamically using parent hierarchy
     };
 
     // Create full issue object for file operations
@@ -93,7 +93,7 @@ export class HybridManager {
     
     // Create folder and spec.md file
     const folderPath = await fileManager.createIssueFolder(issue);
-    metadata.folder_path = folderPath.replace(fileManager.getPppPath() + '/', '');
+    // folder_path no longer stored in database - computed dynamically
     issue.folderPath = folderPath;
     
     // Save metadata to database
@@ -146,13 +146,8 @@ export class HybridManager {
     if (updates.name || keywords !== metadata.keywords) {
       const oldKeywords = metadata.keywords !== keywords ? metadata.keywords : undefined;
       const folderPath = await fileManager.updateIssueFolder(issue, oldKeywords);
-      
-      // Update folder path in database if it changed
-      const relativePath = folderPath.replace(fileManager.getPppPath() + '/', '');
-      if (relativePath !== updatedMetadata.folder_path) {
-        await databaseManager.updateIssue(issueId, { folder_path: relativePath });
-        updatedMetadata.folder_path = relativePath;
-      }
+      // folder_path no longer stored in database - computed dynamically when needed
+      issue.folderPath = folderPath;
     }
     
     return issue;
@@ -505,7 +500,7 @@ export class HybridManager {
       sprintId: metadata.sprint_id,
       createdAt: metadata.created_at,
       updatedAt: metadata.updated_at,
-      folderPath: metadata.folder_path,
+      // folderPath computed dynamically when needed using getIssueFolderPath()
       comments
     };
   }

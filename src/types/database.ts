@@ -35,7 +35,7 @@ export interface IssueMetadata {
   created_at: string;
   updated_at: string;
   children: string[]; // Child issue IDs
-  folder_path: string; // Relative path from .ppp/
+  // folder_path removed - computed dynamically using parent hierarchy
 }
 
 export interface SprintMetadata {
@@ -103,7 +103,7 @@ export interface IssueUpdate {
   labels?: string[];
   sprint_id?: string;
   parent_id?: string;
-  folder_path?: string;
+  // folder_path removed - computed dynamically using parent hierarchy
 }
 
 export interface SprintUpdate {

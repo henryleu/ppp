@@ -34,7 +34,7 @@ export interface Issue {
   sprintId?: string;
   createdAt: string;
   updatedAt: string;
-  folderPath: string;
+  folderPath?: string; // Computed dynamically using parent hierarchy - not stored in database
   comments: IssueComment[];
 }
 
