@@ -184,26 +184,55 @@ export function createIssueCommand(): Command {
 
   // ppp issue list
   issueCommand
-    .command('list')
-    .description('List issues')
+    .command('list [issue_id]')
+    .description('List issues (all if no issue_id, or children of specified issue)')
     .option('-p, --parent <parent_id>', 'Filter by parent issue ID')
     .option('-t, --type <type>', 'Filter by issue type')
     .option('-s, --status <status>', 'Filter by issue status')
     .option('-a, --assignee <assignee>', 'Filter by assignee')
     .option('--sprint <sprint_id>', 'Filter by sprint ID')
-    .action(async (options) => {
+    .action(async (issueId, options) => {
       try {
+        let parentIssue = null;
+        let effectiveParentId = options.parent;
+
+        // If issueId is provided, validate it exists and use it as parent filter
+        if (issueId) {
+          parentIssue = await hybridManager.getIssue(issueId);
+          if (!parentIssue) {
+            console.error(`[ERROR] Issue ${issueId} not found`);
+            process.exit(1);
+          }
+          
+          // Override parent filter with provided issueId
+          effectiveParentId = issueId;
+        }
+
         const issues = await hybridManager.listIssues({
-          parentId: options.parent,
+          parentId: effectiveParentId,
           type: options.type as IssueType,
           assignee: options.assignee,
           labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : undefined,
           sprintId: options.sprint
         });
 
+        // Show appropriate message based on context
         if (issues.length === 0) {
-          console.log('No issues found.');
+          if (parentIssue) {
+            console.log(`No child issues found under ${parentIssue.id} (${parentIssue.name}).`);
+          } else if (effectiveParentId) {
+            console.log(`No issues found with parent ${effectiveParentId}.`);
+          } else {
+            console.log('No issues found.');
+          }
           return;
+        }
+
+        // Show parent context if listing children
+        if (parentIssue) {
+          console.log(`\nChild issues under ${parentIssue.id}: ${parentIssue.name}`);
+          console.log(`Type: ${parentIssue.type} | Status: ${parentIssue.status} | Priority: ${parentIssue.priority}`);
+          console.log('-'.repeat(60));
         }
 
         const table = createTable({
@@ -225,7 +254,13 @@ export function createIssueCommand(): Command {
 
         console.log('\nIssues:\n');
         console.log(table.toString());
-        console.log(`\nTotal: ${issues.length} issues`);
+        
+        // Show appropriate total message
+        if (parentIssue) {
+          console.log(`\nTotal: ${issues.length} child issues under ${parentIssue.id}`);
+        } else {
+          console.log(`\nTotal: ${issues.length} issues`);
+        }
       } catch (error) {
         console.error(`[ERROR] Failed to list issues: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
