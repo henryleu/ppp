@@ -167,12 +167,13 @@ export class HybridManager {
   /**
    * List issues with filtering
    */
-  public async listIssues(filter?: Partial<IssueCreationData & { sprintId?: string }>): Promise<Issue[]> {
+  public async listIssues(filter?: Partial<IssueCreationData & { sprintId?: string; status?: string }>): Promise<Issue[]> {
     // Convert filter to database format
     const dbFilter: IssueFilter = {};
     if (filter) {
       if (filter.parentId !== undefined) dbFilter.parent_id = filter.parentId;
       if (filter.type) dbFilter.type = filter.type;
+      if ((filter as any).status) dbFilter.status = (filter as any).status;
       if (filter.assignee !== undefined) dbFilter.assignee = filter.assignee;
       if (filter.labels) dbFilter.labels = filter.labels;
       if ((filter as any).sprintId !== undefined) dbFilter.sprint_id = (filter as any).sprintId;
@@ -180,6 +181,66 @@ export class HybridManager {
 
     const metadataList = await databaseManager.getIssues(dbFilter);
     return Promise.all(metadataList.map(metadata => this.metadataToIssue(metadata)));
+  }
+
+  /**
+   * List issues in hierarchical order with numbering
+   */
+  public async listIssuesHierarchical(rootParentId?: string, filter?: Partial<IssueCreationData & { sprintId?: string; status?: string }>): Promise<Issue[]> {
+    // Get all issues with optional filtering
+    const allIssues = await this.listIssues(filter);
+    
+    // Build hierarchy tree
+    const issueMap = new Map<string, Issue>();
+    const childrenMap = new Map<string, Issue[]>();
+    
+    // Create maps for quick lookup
+    allIssues.forEach(issue => {
+      issueMap.set(issue.id, issue);
+      if (!childrenMap.has(issue.parentId || 'root')) {
+        childrenMap.set(issue.parentId || 'root', []);
+      }
+      childrenMap.get(issue.parentId || 'root')!.push(issue);
+    });
+    
+    // Sort children by ID for consistent ordering
+    childrenMap.forEach(children => {
+      children.sort((a, b) => a.id.localeCompare(b.id));
+    });
+    
+    // Traverse hierarchy depth-first to build ordered list
+    const result: Issue[] = [];
+    
+    const traverse = (parentId: string | null) => {
+      const children = childrenMap.get(parentId || 'root') || [];
+      
+      children.forEach((child) => {
+        // Add issue without numbering - just maintain hierarchical order
+        result.push(child);
+        
+        // Recursively add children
+        traverse(child.id);
+      });
+    };
+    
+    // Start traversal from the specified root or from all root issues
+    if (rootParentId) {
+      // Find root issue case-insensitively
+      const rootIssue = Array.from(issueMap.values()).find(issue => 
+        issue.id.toUpperCase() === rootParentId.toUpperCase()
+      );
+      if (rootIssue) {
+        // Add the root issue itself first (without numbering since it's the starting point)
+        result.push(rootIssue);
+        // Then add its children in hierarchical order
+        traverse(rootIssue.id);
+      }
+    } else {
+      // Start from all root issues (no parent)
+      traverse(null);
+    }
+    
+    return result;
   }
 
   /**

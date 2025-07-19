@@ -198,7 +198,9 @@ export class DatabaseManager {
 
     if (filter) {
       if (filter.parent_id !== undefined) {
-        issues = issues.filter(issue => issue.parent_id === filter.parent_id);
+        issues = issues.filter(issue => 
+          issue.parent_id?.toUpperCase() === filter.parent_id?.toUpperCase()
+        );
       }
       if (filter.type) {
         issues = issues.filter(issue => issue.type === filter.type);
