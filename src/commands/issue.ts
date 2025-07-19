@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { IssueType, IssuePriority, IssueStatus } from '../types/issue.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
 import { createTable } from '../utils/table.js';
+import { truncateText } from '../utils/llm.js';
 
 export function createIssueCommand(): Command {
   const issueCommand = new Command('issue');
@@ -40,13 +41,13 @@ export function createIssueCommand(): Command {
         // If name is undefined, parentId actually contains the name
         let actualParentId = parentId;
         let actualName = name;
-        
+
         if (!name && parentId) {
           // This means parentId is actually the name (no parent provided)
           actualName = parentId;
           actualParentId = undefined;
         }
-        
+
         // For now, require name parameter (interactive mode to be implemented later)
         if (!actualName) {
           console.error('[ERROR] Issue name is required');
@@ -60,7 +61,7 @@ export function createIssueCommand(): Command {
           type: type as IssueType,
           name: actualName,
           description: options.description,
-          priority: priority === 'high' ? IssuePriority.HIGH : 
+          priority: priority === 'high' ? IssuePriority.HIGH :
                    priority === 'low' ? IssuePriority.LOW : IssuePriority.MEDIUM,
           assignee: options.assignee,
           reporter: options.reporter,
@@ -75,7 +76,7 @@ export function createIssueCommand(): Command {
         console.log(`Name: ${issue.name}`);
         console.log(`Keywords: ${issue.keywords}`);
         console.log(`Folder: ${issue.folderPath}`);
-        
+
         if (actualParentId) {
           console.log(`Parent: ${actualParentId}`);
         }
@@ -133,7 +134,7 @@ export function createIssueCommand(): Command {
             console.error('Valid priorities: high, medium, low');
             process.exit(1);
           }
-          updateData.priority = priority === 'high' ? IssuePriority.HIGH : 
+          updateData.priority = priority === 'high' ? IssuePriority.HIGH :
                               priority === 'low' ? IssuePriority.LOW : IssuePriority.MEDIUM;
         }
 
@@ -185,41 +186,54 @@ export function createIssueCommand(): Command {
   // ppp issue list
   issueCommand
     .command('list [issue_id]')
-    .description('List issues (all if no issue_id, or children of specified issue)')
+    .description('List issues in various formats: top-level, hierarchical tree, or parent-filtered')
     .option('-p, --parent <parent_id>', 'Filter by parent issue ID')
-    .option('-t, --type <type>', 'Filter by issue type')
-    .option('-s, --status <status>', 'Filter by issue status')
-    .option('-a, --assignee <assignee>', 'Filter by assignee')
+    .option('-t, --type <type>', 'Filter by issue type (feature, story, task, bug)')
+    .option('-s, --status <status>', 'Filter by issue status (new, in_progress, done, blocked, cancelled)')
+    .option('-a, --assignee <assignee>', 'Filter by assignee name')
+    .option('-l, --labels <labels>', 'Filter by labels (comma-separated)')
     .option('--sprint <sprint_id>', 'Filter by sprint ID')
     .action(async (issueId, options) => {
       try {
         let parentIssue = null;
         let effectiveParentId = options.parent;
 
-        // If issueId is provided, validate it exists and use it as parent filter
+        let issues: any[];
+
+        // If issueId is provided, validate it exists and show hierarchical view of descendants
         if (issueId) {
           parentIssue = await hybridManager.getIssue(issueId);
           if (!parentIssue) {
             console.error(`[ERROR] Issue ${issueId} not found`);
             process.exit(1);
           }
-          
-          // Override parent filter with provided issueId
-          effectiveParentId = issueId;
-        }
 
-        const issues = await hybridManager.listIssues({
-          parentId: effectiveParentId,
-          type: options.type as IssueType,
-          assignee: options.assignee,
-          labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : undefined,
-          sprintId: options.sprint
-        });
+          // Use hierarchical listing to show all descendants in proper order
+          issues = await hybridManager.listIssuesHierarchical(issueId, {
+            type: options.type as IssueType,
+            status: options.status,
+            assignee: options.assignee,
+            labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : undefined,
+            sprintId: options.sprint
+          });
+        } else {
+          // No issueId provided - show only top-level issues (no parent)
+          effectiveParentId = options.parent || null;
+          
+          issues = await hybridManager.listIssues({
+            parentId: effectiveParentId,
+            type: options.type as IssueType,
+            status: options.status,
+            assignee: options.assignee,
+            labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : undefined,
+            sprintId: options.sprint
+          });
+        }
 
         // Show appropriate message based on context
         if (issues.length === 0) {
           if (parentIssue) {
-            console.log(`No child issues found under ${parentIssue.id} (${parentIssue.name}).`);
+            console.log(`No descendant issues found under ${parentIssue.id} (${parentIssue.name}).`);
           } else if (effectiveParentId) {
             console.log(`No issues found with parent ${effectiveParentId}.`);
           } else {
@@ -228,22 +242,31 @@ export function createIssueCommand(): Command {
           return;
         }
 
-        // Show parent context if listing children
+        // Show context based on listing type
         if (parentIssue) {
-          console.log(`\nChild issues under ${parentIssue.id}: ${parentIssue.name}`);
+          // Hierarchical view of descendants under specific parent
+          console.log(`\nHierarchical view under ${parentIssue.id}: ${parentIssue.name}`);
           console.log(`Type: ${parentIssue.type} | Status: ${parentIssue.status} | Priority: ${parentIssue.priority}`);
           console.log('-'.repeat(60));
+        } else if (effectiveParentId) {
+          // Flat view filtered by parent
+          console.log(`\nIssues with parent ${effectiveParentId}:`);
+          console.log('-'.repeat(40));
+        } else {
+          // Top-level issues (no parent)
+          console.log(`\nTop-level issues:`);
+          console.log('-'.repeat(20));
         }
 
         const table = createTable({
           head: ['ID', 'Name', 'Type', 'Status', 'Priority', 'Assignee', 'Parent'],
-          colWidths: [12, 30, 12, 12, 10, 15, 12]
+          colWidths: [12, 37, 12, 14, 10, 15, 12]
         });
 
         issues.forEach(issue => {
           table.push([
             issue.id,
-            issue.name.length > 27 ? issue.name.substring(0, 27) + '...' : issue.name,
+            truncateText(issue.name, 37),
             issue.type,
             issue.status,
             issue.priority,
@@ -254,12 +277,14 @@ export function createIssueCommand(): Command {
 
         console.log('\nIssues:\n');
         console.log(table.toString());
-        
+
         // Show appropriate total message
         if (parentIssue) {
-          console.log(`\nTotal: ${issues.length} child issues under ${parentIssue.id}`);
+          console.log(`\nTotal: ${issues.length} issues in hierarchy under ${parentIssue.id}`);
+        } else if (effectiveParentId) {
+          console.log(`\nTotal: ${issues.length} issues with parent ${effectiveParentId}`);
         } else {
-          console.log(`\nTotal: ${issues.length} issues`);
+          console.log(`\nTotal: ${issues.length} top-level issues`);
         }
       } catch (error) {
         console.error(`[ERROR] Failed to list issues: ${error instanceof Error ? error.message : 'Unknown error'}`);
