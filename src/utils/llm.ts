@@ -38,17 +38,56 @@ export function createLLMClient(config: LLMConfig) {
 }
 
 /**
- * Sanitize keywords for use in file/folder names
+ * Check if text contains Chinese characters
+ */
+export function isChineseText(text: string): boolean {
+  return /[\u4e00-\u9fff]/.test(text);
+}
+
+/**
+ * Get display length accounting for Chinese characters (which are wider)
+ */
+export function getStringDisplayLength(text: string): number {
+  let length = 0;
+  for (const char of text) {
+    // Chinese characters count as 2 display units
+    if (/[\u4e00-\u9fff]/.test(char)) {
+      length += 2;
+    } else {
+      length += 1;
+    }
+  }
+  return length;
+}
+
+/**
+ * Sanitize keywords for use in file/folder names (Unicode-aware)
  */
 export function sanitizeKeywords(keywords: string): string {
-  return keywords
+  const sanitized = keywords
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+    .replace(/[^\p{L}\p{N}\s-]/gu, '') // Remove special chars except Unicode letters, numbers, spaces and hyphens
     .replace(/\s+/g, '_') // Replace spaces with underscores
     .replace(/-+/g, '_') // Replace hyphens with underscores
     .replace(/_+/g, '_') // Replace multiple underscores with single
-    .replace(/^_|_$/g, '') // Remove leading/trailing underscores
-    .slice(0, 50); // Max 50 characters
+    .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+
+  // Limit by display length (accounting for Chinese characters being wider)
+  const maxDisplayLength = 50;
+  let currentDisplayLength = 0;
+  let result = '';
+  
+  for (const char of sanitized) {
+    const charDisplayLength = /[\u4e00-\u9fff]/.test(char) ? 2 : 1;
+    if (currentDisplayLength + charDisplayLength <= maxDisplayLength) {
+      result += char;
+      currentDisplayLength += charDisplayLength;
+    } else {
+      break;
+    }
+  }
+  
+  return result;
 }
 
 /**
@@ -61,9 +100,34 @@ function countMeaningfulWords(issueName: string): number {
     'make', 'build', 'develop', 'setup', 'set', 'up', 'new', 'fix', 'update', 'modify', 'change'
   ]);
 
+  // Chinese common words
+  const chineseCommonWords = new Set([
+    '的', '了', '是', '在', '有', '和', '与', '或', '但', '而', '从', '到', '为', '以', '对', '将',
+    '创建', '添加', '实现', '制作', '构建', '开发', '设置', '新的', '修复', '更新', '修改', '改变'
+  ]);
+
+  // If text contains Chinese, handle it differently
+  if (isChineseText(issueName)) {
+    // For Chinese text, count individual meaningful characters/words
+    const chineseWords = issueName
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Keep Unicode letters and numbers
+      .split(/\s+/)
+      .filter(word => {
+        if (word.length === 0) return false;
+        // For Chinese words, check against Chinese common words
+        if (/[\u4e00-\u9fff]/.test(word)) {
+          return !chineseCommonWords.has(word) && word.length >= 1;
+        }
+        // For English words, use existing logic
+        return word.length > 2 && !commonWords.has(word.toLowerCase());
+      });
+    return chineseWords.length;
+  }
+
+  // For non-Chinese text, use original logic
   const words = issueName
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ') // Replace non-alphanumeric with spaces
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Replace non-alphanumeric with spaces (Unicode-aware)
     .split(/\s+/)
     .filter(word => word.length > 2 && !commonWords.has(word));
 
@@ -137,7 +201,7 @@ Shortened keywords:`;
 }
 
 /**
- * Fallback keyword generation using simple text processing
+ * Fallback keyword generation using simple text processing (Unicode-aware)
  */
 export function generateFallbackKeywords(issueName: string): string {
   const commonWords = new Set([
@@ -146,11 +210,36 @@ export function generateFallbackKeywords(issueName: string): string {
     'make', 'build', 'develop', 'setup', 'set', 'up', 'new', 'fix', 'update', 'modify', 'change'
   ]);
 
-  const words = issueName
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ') // Replace non-alphanumeric with spaces
-    .split(/\s+/)
-    .filter(word => word.length > 2 && !commonWords.has(word));
+  // Chinese common words
+  const chineseCommonWords = new Set([
+    '的', '了', '是', '在', '有', '和', '与', '或', '但', '而', '从', '到', '为', '以', '对', '将',
+    '创建', '添加', '实现', '制作', '构建', '开发', '设置', '新的', '修复', '更新', '修改', '改变'
+  ]);
+
+  let words: string[];
+
+  if (isChineseText(issueName)) {
+    // For Chinese text, preserve meaningful characters and words
+    words = issueName
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Keep Unicode letters and numbers
+      .split(/\s+/)
+      .filter(word => {
+        if (word.length === 0) return false;
+        // For Chinese words, check against Chinese common words
+        if (/[\u4e00-\u9fff]/.test(word)) {
+          return !chineseCommonWords.has(word) && word.length >= 1;
+        }
+        // For English words mixed in, use existing logic
+        return word.length > 2 && !commonWords.has(word.toLowerCase());
+      });
+  } else {
+    // For non-Chinese text, use Unicode-aware processing
+    words = issueName
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ') // Replace non-alphanumeric with spaces (Unicode-aware)
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !commonWords.has(word));
+  }
 
   // For short names, keep all meaningful words (don't limit to 4)
   // For long names, limit to 4 words
