@@ -49,7 +49,14 @@ All PPP features are built on top of following building blocks:
 
     4. **Bug ID**: Bugs must be put under a specific feature doc folder and ID must be prefixed with a specific feature/Epic/User Story/Task ID's digits part, and also be suffixed with an auto-incremented 2-digits number as what Epic/User Story/Task ID does. i.e. if a bug belongs to a feature F0105, The bug ID goes like B010501, "0105" mean the bug belongs to feature B0105. if a bug belongs to feature T010101, The bug ID goes like B010101, "01" mean the bug belongs to feature F0101.
 
-  - **ID Generation System**: PPP uses a counter-based ID generation system that maintains auto-incrementing counters for each issue type and hierarchy level. The counters are stored in `.ppp/.counters.json` file and are automatically updated when new issues are created. This ensures unique IDs and prevents conflicts even when issues are created concurrently or when the file system is modified externally.
+  - **ID Generation System**: PPP uses a counter-based ID generation system that maintains auto-incrementing counters for each issue type and hierarchy level. The counters are stored in the `.ppp/database.yml` file and are automatically updated when new issues are created. This ensures unique IDs and prevents conflicts even when issues are created concurrently or when the file system is modified externally.
+
+  - **Issue ID Matching**: PPP uses case-insensitive matching when searching for or referencing issue IDs. This means that `f01`, `F01`, and `F01` are all treated as the same issue ID. Users can use lowercase, uppercase, or mixed case when specifying issue IDs in commands, and PPP will automatically find the correct issue. For example:
+    - `ppp issue update f01 "New Name"` (lowercase)
+    - `ppp issue update F01 "New Name"` (uppercase)  
+    - `ppp sprint add f01 01` (lowercase issue ID)
+    - `ppp sprint add F01 01` (uppercase issue ID)
+    All of these commands will work with the same issue `F01`.
 
 
 3. **Issue Name** is assigned by ppp user when issue is created. and its **Name Keywords** is genrated by ppp (which will use LLM API to genrate keywords from issue name configured by user in settings.json file in the future) and used by issue filing as file name.
@@ -219,14 +226,6 @@ During **issue deletion**, ppp will:
 - remove the issue record in Feature Bill if the deleted issue is a module/feature;
 - remove the issue record in Sprint file if the issue has been assigned to a sprint;
 
-#### put issue to sprint
-***issue put*** command put an issue to a sprint with sprint no provided during the command execution. And it uses `put` sub command and goes like `ppp issue put <issue_id> <sprint_no>`.
-
-During **issue put to sprint**, ppp will:
-- update the issue's sprint assignedment to the sprint no in its issue file;
-- update the issue's sprint assignment in its issue file;
-- update the issue record in the sprint file to add the issue to the sprint's issue list;
-
 ### **Sprint** Features
 All the sprint related features are under `ppp sprint` command.
 
@@ -254,3 +253,19 @@ During **sprint updation**, ppp will:
 During **sprint activation**, ppp will:
 - update Release file to activate the sprint in the sprint list;
 - update all the issues assigned to the sprint to set their status to 'In Progress';
+
+#### add issue to sprint
+***sprint add*** command adds an issue to a sprint with sprint no provided during the command execution. And it uses `add` sub command and goes like `ppp sprint add <issue_id> <sprint_no>`.
+
+During **sprint add issue**, ppp will:
+- update the issue's sprint assignment to the sprint no in its issue file;
+- update the issue record in the sprint file to add the issue to the sprint's issue list;
+- maintain bidirectional relationship between issue and sprint;
+
+#### remove issue from sprint
+***sprint remove*** command removes an issue from a sprint with sprint no provided during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_no>`.
+
+During **sprint remove issue**, ppp will:
+- update the issue's sprint assignment to remove the sprint reference in its issue file;
+- update the issue record in the sprint file to remove the issue from the sprint's issue list;
+- maintain bidirectional relationship cleanup between issue and sprint;

@@ -1,77 +1,21 @@
-import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
-import { fileExists } from './settings.js';
 import { IssueType, getIdPrefix, generateChildIdDigits } from '../types/issue.js';
+import { databaseManager } from './database.js';
 
-export interface CounterData {
-  // Feature counters by level
-  features: {
-    level1: number;         // F01, F02, F03...
-    level2: Record<string, number>; // F01 -> 01, 02, 03... (for F0101, F0102, F0103...)
-    level3: Record<string, number>; // F0101 -> 01, 02, 03... (for F010101, F010102...)
-  };
-  
-  // Task counters by parent
-  tasks: Record<string, number>; // F01 -> 01, 02, 03... (for T0101, T0102...)
-  
-  // Bug counters by parent
-  bugs: Record<string, number>; // F01 -> 01, 02, 03... (for B0101, B0102...)
-  
-  // Sprint counter
-  sprints: number; // 1, 2, 3... (for Sprint-01, Sprint-02...)
+// Re-export CounterData from database types for backward compatibility
+export type { CounterData } from '../types/database.js';
+
+/**
+ * Load counters from database
+ */
+async function loadCounters() {
+  return await databaseManager.getCounters();
 }
 
-const DEFAULT_COUNTERS: CounterData = {
-  features: {
-    level1: 0,
-    level2: {},
-    level3: {}
-  },
-  tasks: {},
-  bugs: {},
-  sprints: 0
-};
-
-export function getCountersPath(): string {
-  return join(process.cwd(), '.ppp', '.counters.json');
-}
-
-export async function loadCounters(): Promise<CounterData> {
-  const countersPath = getCountersPath();
-  
-  try {
-    if (!(await fileExists(countersPath))) {
-      return { ...DEFAULT_COUNTERS };
-    }
-    
-    const content = await readFile(countersPath, 'utf-8');
-    const data = JSON.parse(content);
-    
-    // Merge with defaults to handle missing properties
-    return {
-      features: {
-        level1: data.features?.level1 || 0,
-        level2: data.features?.level2 || {},
-        level3: data.features?.level3 || {}
-      },
-      tasks: data.tasks || {},
-      bugs: data.bugs || {},
-      sprints: data.sprints || 0
-    };
-  } catch (error) {
-    console.warn('Failed to load counters, using defaults:', error);
-    return { ...DEFAULT_COUNTERS };
-  }
-}
-
-export async function saveCounters(counters: CounterData): Promise<void> {
-  const countersPath = getCountersPath();
-  
-  try {
-    await writeFile(countersPath, JSON.stringify(counters, null, 2));
-  } catch (error) {
-    throw new Error(`Failed to save counters: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+/**
+ * Save counters to database
+ */
+async function saveCounters(counters: any) {
+  await databaseManager.updateCounters(counters);
 }
 
 export async function generateIssueId(type: IssueType, parentId?: string): Promise<string> {
@@ -151,16 +95,12 @@ export async function generateIssueId(type: IssueType, parentId?: string): Promi
 
 export async function generateSprintId(): Promise<string> {
   const counters = await loadCounters();
-  counters.sprints++;
+  const newSprintNo = counters.sprints + 1;
   
-  const sprintId = `Sprint-${counters.sprints.toString().padStart(2, '0')}`;
+  const sprintId = `Sprint-${newSprintNo.toString().padStart(2, '0')}`;
   
-  await saveCounters(counters);
+  await saveCounters({ sprints: newSprintNo });
   return sprintId;
-}
-
-export async function resetCounters(): Promise<void> {
-  await saveCounters({ ...DEFAULT_COUNTERS });
 }
 
 export async function getNextId(type: IssueType, parentId?: string): Promise<string> {

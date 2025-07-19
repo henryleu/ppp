@@ -8,6 +8,7 @@ import { initCommand } from './commands/init.js';
 import { createConfigCommand } from './commands/config.js';
 import { createKeywordsCommand } from './commands/keywords.js';
 import { createIssueCommand } from './commands/issue.js';
+import { createSprintCommand } from './commands/sprint.js';
 import { startMCPServer } from './mcp/server.js';
 import { isFirstRun } from './utils/settings.js';
 import { handleFirstRun } from './utils/welcome.js';
@@ -47,6 +48,9 @@ if (process.argv.includes('--mcp-server')) {
 
   // Add issue command for issue management
   program.addCommand(createIssueCommand());
+
+  // Add sprint command for sprint management
+  program.addCommand(createSprintCommand());
 
   program
     .command('generate')

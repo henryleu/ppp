@@ -2,6 +2,7 @@ import { Issue, IssueType, IssueStatus, IssuePriority, IssueCreationData, IssueU
 import { generateIssueId } from './id-generator.js';
 import { generateIssueNameKeywords } from './llm.js';
 import { fileManager } from './file-manager.js';
+import { sprintManager } from './sprint.js';
 
 export class IssueManager {
   /**
@@ -239,15 +240,58 @@ export class IssueManager {
   /**
    * Assign issue to sprint
    */
-  public async assignToSprint(issueId: string, sprintId: string): Promise<void> {
+  public async assignToSprint(issueId: string, sprintIdentifier: string): Promise<void> {
+    // Convert sprint number to sprint ID format if needed
+    const sprintId = sprintIdentifier.startsWith('Sprint-') 
+      ? sprintIdentifier 
+      : `Sprint-${sprintIdentifier.padStart(2, '0')}`;
+    
+    // Check if sprint exists
+    const sprint = await fileManager.readSprintFile(sprintId);
+    if (!sprint) {
+      throw new Error(`Sprint ${sprintIdentifier} not found`);
+    }
+    
+    // Check if issue exists
+    const issue = await fileManager.readIssueSpec(issueId);
+    if (!issue) {
+      throw new Error(`Issue ${issueId} not found`);
+    }
+    
+    // Remove issue from current sprint if it has one
+    if (issue.sprintId) {
+      await this.removeFromSprint(issueId);
+    }
+    
+    // Update issue with sprint assignment
     const updateData: IssueUpdateData = { sprintId };
     await this.updateIssue(issueId, updateData);
+    
+    // Add issue to sprint's issue list
+    const sprintNo = sprintId.replace('Sprint-', '');
+    await sprintManager.addIssueToSprint(issueId, sprintNo);
   }
   
   /**
    * Remove issue from sprint
    */
   public async removeFromSprint(issueId: string): Promise<void> {
+    // Check if issue exists and has a sprint assignment
+    const issue = await fileManager.readIssueSpec(issueId);
+    if (!issue) {
+      throw new Error(`Issue ${issueId} not found`);
+    }
+    
+    if (!issue.sprintId) {
+      // Issue is not assigned to any sprint, nothing to do
+      return;
+    }
+    
+    // Remove issue from sprint's issue list
+    const sprintNo = issue.sprintId.replace('Sprint-', '');
+    await sprintManager.removeIssueFromSprint(issueId, sprintNo);
+    
+    // Update issue to remove sprint assignment
     const updateData: IssueUpdateData = { sprintId: undefined };
     await this.updateIssue(issueId, updateData);
   }

@@ -11,6 +11,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { initCommand } from "../commands/init.js";
+import { sprintManager } from "../utils/sprint.js";
 import { readdir, readFile, stat } from "fs/promises";
 import { join } from "path";
 
@@ -60,6 +61,57 @@ export async function startMCPServer() {
             type: "object",
             properties: {},
             required: []
+          }
+        },
+        {
+          name: "ppp_sprint_create",
+          description: "Create a new sprint",
+          inputSchema: {
+            type: "object",
+            properties: {
+              description: {
+                type: "string",
+                description: "Sprint description"
+              }
+            },
+            required: ["description"]
+          }
+        },
+        {
+          name: "ppp_sprint_list",
+          description: "List all sprints with their status",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: []
+          }
+        },
+        {
+          name: "ppp_sprint_activate",
+          description: "Activate a sprint (deactivates any currently active sprint)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              sprintNo: {
+                type: "string",
+                description: "Sprint number to activate (e.g., '01', '02')"
+              }
+            },
+            required: ["sprintNo"]
+          }
+        },
+        {
+          name: "ppp_sprint_complete",
+          description: "Complete an active sprint",
+          inputSchema: {
+            type: "object",
+            properties: {
+              sprintNo: {
+                type: "string",
+                description: "Sprint number to complete (e.g., '01', '02')"
+              }
+            },
+            required: ["sprintNo"]
           }
         }
       ]
@@ -113,6 +165,105 @@ export async function startMCPServer() {
               ]
             };
           }
+
+        case "ppp_sprint_create":
+          const sprintDescription = args?.description;
+          if (!sprintDescription) {
+            throw new McpError(ErrorCode.InvalidParams, "Description is required");
+          }
+          
+          const sprint = await sprintManager.createSprint({ description: sprintDescription });
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Successfully created ${sprint.name}\n\nDetails:\n- Description: ${sprint.description}\n- Status: ${sprint.state}\n- Start Date: ${new Date(sprint.startDate).toLocaleDateString()}\n- File: .ppp/${sprint.id}.md`
+              }
+            ]
+          };
+
+        case "ppp_sprint_list":
+          const sprints = await sprintManager.getAllSprints();
+          
+          if (sprints.length === 0) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "No sprints found. Create one with ppp_sprint_create."
+                }
+              ]
+            };
+          }
+          
+          const activeSprint = await sprintManager.getActiveSprint();
+          let sprintList = "All Sprints:\n\n";
+          
+          for (const sprint of sprints) {
+            sprintList += `- ${sprint.name} (${sprint.state})\n`;
+            sprintList += `  Start: ${new Date(sprint.startDate).toLocaleDateString()}\n`;
+            sprintList += `  Issues: ${sprint.issueCount}, Velocity: ${sprint.velocity}\n\n`;
+          }
+          
+          if (activeSprint) {
+            sprintList += `\nActive Sprint: ${activeSprint.name}\n`;
+            sprintList += `Description: ${activeSprint.description}\n`;
+            sprintList += `Issues: ${activeSprint.issues.length}`;
+          } else {
+            sprintList += "\nNo active sprint.";
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: sprintList
+              }
+            ]
+          };
+
+        case "ppp_sprint_activate":
+          const sprintNoActivate = args?.sprintNo;
+          if (!sprintNoActivate) {
+            throw new McpError(ErrorCode.InvalidParams, "Sprint number is required");
+          }
+          
+          const activateSuccess = await sprintManager.activateSprint(sprintNoActivate);
+          
+          if (!activateSuccess) {
+            throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintNoActivate} not found`);
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Successfully activated Sprint ${sprintNoActivate}\n\n- All previously active sprints have been completed\n- All issues in this sprint are now "In Progress"\n- Release.md has been updated`
+              }
+            ]
+          };
+
+        case "ppp_sprint_complete":
+          const sprintNoComplete = args?.sprintNo;
+          if (!sprintNoComplete) {
+            throw new McpError(ErrorCode.InvalidParams, "Sprint number is required");
+          }
+          
+          const completeSuccess = await sprintManager.completeSprint(sprintNoComplete);
+          
+          if (!completeSuccess) {
+            throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintNoComplete} not found`);
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Successfully completed Sprint ${sprintNoComplete}\n\n- Sprint velocity calculated based on completed issues\n- Release.md has been updated\n- Sprint is now available for archival`
+              }
+            ]
+          };
 
         default:
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

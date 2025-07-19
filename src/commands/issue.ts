@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import { IssueType, IssuePriority, IssueStatus } from '../types/issue.js';
-import { issueManager } from '../utils/issue.js';
+import { hybridManager } from '../utils/hybrid-manager.js';
 import { createTable } from '../utils/table.js';
 
 export function createIssueCommand(): Command {
@@ -68,7 +68,7 @@ export function createIssueCommand(): Command {
           parentId: actualParentId
         };
 
-        const issue = await issueManager.createIssue(issueData);
+        const issue = await hybridManager.createIssue(issueData);
 
         console.log(`[OK] Issue created successfully!`);
         console.log(`ID: ${issue.id}`);
@@ -145,7 +145,7 @@ export function createIssueCommand(): Command {
           updateData.labels = options.labels.split(',').map((l: string) => l.trim());
         }
 
-        const updatedIssue = await issueManager.updateIssue(issueId, updateData);
+        const updatedIssue = await hybridManager.updateIssue(issueId, updateData);
 
         console.log(`[OK] Issue updated successfully!`);
         console.log(`ID: ${updatedIssue.id}`);
@@ -173,7 +173,7 @@ export function createIssueCommand(): Command {
           process.exit(1);
         }
 
-        await issueManager.deleteIssue(issueId);
+        await hybridManager.deleteIssue(issueId);
 
         console.log(`[OK] Issue ${issueId} deleted successfully (moved to archive)`);
       } catch (error) {
@@ -193,11 +193,11 @@ export function createIssueCommand(): Command {
     .option('--sprint <sprint_id>', 'Filter by sprint ID')
     .action(async (options) => {
       try {
-        const issues = await issueManager.listIssues({
+        const issues = await hybridManager.listIssues({
           parentId: options.parent,
           type: options.type as IssueType,
-          status: options.status as IssueStatus,
           assignee: options.assignee,
+          labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : undefined,
           sprintId: options.sprint
         });
 
@@ -228,23 +228,6 @@ export function createIssueCommand(): Command {
         console.log(`\nTotal: ${issues.length} issues`);
       } catch (error) {
         console.error(`[ERROR] Failed to list issues: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        process.exit(1);
-      }
-    });
-
-  // ppp issue put (assign to sprint)
-  issueCommand
-    .command('put')
-    .description('Assign issue to sprint')
-    .argument('<issue_id>', 'Issue ID to assign')
-    .argument('<sprint_id>', 'Sprint ID to assign to')
-    .action(async (issueId, sprintId) => {
-      try {
-        await issueManager.assignToSprint(issueId, sprintId);
-
-        console.log(`[OK] Issue ${issueId} assigned to sprint ${sprintId}`);
-      } catch (error) {
-        console.error(`[ERROR] Failed to assign issue to sprint: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });

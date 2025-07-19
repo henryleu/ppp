@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import prompts from 'prompts';
 import { createTable } from '../utils/table.js';
+import { hybridManager } from '../utils/hybrid-manager.js';
 
 export async function initCommand() {
   console.log('>>> Initializing ppp in current directory...\n');
@@ -58,6 +59,9 @@ export async function initCommand() {
     const implContent = `# IMPL.md\n\n## Implementation Notes\n\n### Architecture\n\n- TBD\n\n### Development Notes\n\n- TBD\n`;
     await writeFile('.ppp/IMPL.md', implContent);
 
+    // Initialize database
+    await hybridManager.initialize(response.projectName);
+
     const table = createTable({
       head: ['File', 'Status'],
       colWidths: [25, 15]
@@ -65,6 +69,7 @@ export async function initCommand() {
 
     table.push(
       ['.ppp/settings.json', '[OK] Created'],
+      ['.ppp/database.yml', '[OK] Created'],
       ['.ppp/README.md', '[OK] Created'],
       ['.ppp/TRACK.md', '[OK] Created'],
       ['.ppp/SPEC.md', '[OK] Created'],
