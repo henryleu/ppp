@@ -44,3 +44,11 @@ ppp is command line tool which is used to manage and track product blacklog, tas
 ### ppp generate
 
 export HTTPS_PROXY=http://127.0.0.1:7897
+test all issue commands under test-ppp referencing @README.md
+
+refactor ppp init command to disable the interactive ui, and just use cli line for the command.
+  - make project name to be a -n --name flag and be optional, by default "newproject"
+  - remove other 2 parameters, it is useless.
+  - revise related settings attributes accordingly.
+
+

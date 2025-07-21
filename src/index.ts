@@ -38,6 +38,8 @@ if (process.argv.includes('--mcp-server')) {
   program
     .command('init')
     .description('Initialize ppp in current directory')
+    .option('-n, --name <name>', 'Project name', 'newproject')
+    .option('--template <template>', 'Project template (noop)', '')
     .action(initCommand);
 
   // Add config command with subcommands

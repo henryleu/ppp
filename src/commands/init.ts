@@ -1,66 +1,39 @@
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
-import prompts from 'prompts';
 import { createTable } from '../utils/table.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
 
-export async function initCommand() {
+export async function initCommand(options: { name: string, template: string }) {
   console.log('>>> Initializing ppp in current directory...\n');
 
-  const questions = [
-    {
-      type: 'text' as const,
-      name: 'projectName',
-      message: 'Project name:',
-      initial: 'my-project'
-    },
-    {
-      type: 'text' as const,
-      name: 'description',
-      message: 'Project description:',
-      initial: 'A new ppp project'
-    },
-    {
-      type: 'confirm' as const,
-      name: 'createReadme',
-      message: 'Create README.md?',
-      initial: true
-    }
-  ];
-
-  const response = await prompts(questions);
-
-  if (!response.projectName) {
-    console.log('[ERROR] Initialization cancelled');
-    return;
-  }
+  const projectName = options.name;
 
   try {
     await mkdir('.ppp', { recursive: true });
 
     const settings = {
-      name: response.projectName,
-      description: response.description,
+      name: projectName,
+      description: '',
       created: new Date().toISOString(),
       version: '1.0.0'
     };
 
     await writeFile('.ppp/settings.json', JSON.stringify(settings, null, 2));
 
-    const readmeContent = `# ${response.projectName}\n\n${response.description}\n\nThis project is managed by ppp (Product Prompt Planner).\n`;
+    const readmeContent = `# ${projectName}\n\n\n\nThis project is managed by ppp (Product Prompt Planner).\n`;
     await writeFile('.ppp/README.md', readmeContent);
 
     const trackContent = `# TRACK.md\n\n## Project Tracking\n\n- Created: ${new Date().toLocaleDateString()}\n- Status: Active\n\n## Tasks\n\n- [ ] Initial setup\n`;
     await writeFile('.ppp/TRACK.md', trackContent);
 
-    const specContent = `# SPEC.md\n\n## Project Specification\n\n### Overview\n${response.description}\n\n### Requirements\n\n- TBD\n\n### Technical Specifications\n\n- TBD\n`;
+    const specContent = `# SPEC.md\n\n## Project Specification\n\n### Overview\n\n\n### Requirements\n\n- TBD\n\n### Technical Specifications\n\n- TBD\n`;
     await writeFile('.ppp/SPEC.md', specContent);
 
     const implContent = `# IMPL.md\n\n## Implementation Notes\n\n### Architecture\n\n- TBD\n\n### Development Notes\n\n- TBD\n`;
     await writeFile('.ppp/IMPL.md', implContent);
 
     // Initialize database
-    await hybridManager.initialize(response.projectName);
+    await hybridManager.initialize(projectName);
 
     const table = createTable({
       head: ['File', 'Status'],
