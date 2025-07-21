@@ -165,6 +165,39 @@ The Feature Bill acts as a root node for all module/feature-related work, as:
 
 Thus, the Feature Bill provides a clear starting point to trace from high-level modules down to granular tasks or bugs, ensuring full visibility into the product’s development workflow.
 
+## Getting Started
+
+### Initialize PPP
+To start using PPP in your project, run the init command:
+
+```bash
+ppp init [options]
+```
+
+**Options:**
+- `-n, --name <name>` - Project name (default: 'newproject')
+- `--template <template>` - Project template (currently unused)
+
+**Examples:**
+```bash
+# Initialize with default project name
+ppp init
+
+# Initialize with custom project name
+ppp init --name my-awesome-project
+
+# Shorthand for custom project name
+ppp init -n my-awesome-project
+```
+
+During initialization, PPP will create a `.ppp` directory with the following structure:
+- `.ppp/settings.json` - Project configuration
+- `.ppp/database.yml` - Issue tracking database
+- `.ppp/README.md` - Project overview
+- `.ppp/TRACK.md` - Task tracking
+- `.ppp/SPEC.md` - Project specifications
+- `.ppp/IMPL.md` - Implementation notes
+
 ## Features
 
 ### **Config** Features
