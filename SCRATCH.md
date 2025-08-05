@@ -51,4 +51,3 @@ refactor ppp init command to disable the interactive ui, and just use cli line f
   - remove other 2 parameters, it is useless.
   - revise related settings attributes accordingly.
 
-

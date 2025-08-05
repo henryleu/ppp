@@ -43,3 +43,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Temporary test folder
 temp-test/
+
+# Claude Code task files (local planning files)
+.claude/tasks/

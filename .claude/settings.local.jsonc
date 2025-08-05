@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ppp:*)",
+      "Bash(ppp issue:*)",
+      "Bash(ppp sprint:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run build:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(bun run:*)",
+      "Bash(pkill:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(rm:*)",
+      "Bash(timeout:*)",
+      "Bash(/opt/homebrew/bin/ccr:*)",
+      "Bash(ppp --version)",
+      "Bash(ppp issue create feature \"Admin Dashboard\")",
+      "Bash(ppp issue create feature \"User Management System\")",
+      "Bash(ppp issue create story F01 \"用户注册故事\")",
+      "Bash(ppp issue create task F01 \"Implement user authentication system with JWT tokens and role-based access control\")",
+      "Bash(ppp issue create bug T0102 \"Login form validation error not showing for empty email field\")",
+      "Bash(ppp issue list)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(bash:*)"
+    ],
+    "deny": []
+  }
+}
