@@ -157,11 +157,14 @@ export class HybridManager {
    * Delete an issue from both database and files
    */
   public async deleteIssue(issueId: string): Promise<void> {
+    // Get folder path before deleting from database (since getIssueFolderPath needs database info)
+    const folderPath = await fileManager.getIssueFolderPath(issueId);
+    
     // Delete from database (handles relationships)
     await databaseManager.deleteIssue(issueId);
     
-    // Move folder to archive
-    await fileManager.deleteIssueFolder(issueId);
+    // Move folder to archive using the pre-retrieved path
+    await fileManager.deleteIssueFolderByPath(issueId, folderPath);
   }
 
   /**

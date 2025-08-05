@@ -17,8 +17,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - After you complete tasks in the plan, you should update and append detailed descriptions of the changes you made, so following tasks can be easily hand over to other engineers.
 
 ## Development Guidelines
-
-- Whenever take a temp test which need to create a temp test folder, just use temp-test folder under the root folder.
+- I had run "bun link" to enable the ppp command to work in anywhere, so no need to use "bun dist/index.js .." to run ppp commands, just use "ppp <command>" in any directory.
+- Run all the temporary tests in the reserved temp-test folder under the root folder.
+  - Whenever take temporary tests, just enter the temp-test folder under the root folder.
+  - Check if .ppp folder exists. If not, run `ppp init` to initialize it.
+  - If .ppp folder exists, just run ppp commands to test directly.
+  - Once test is done, it is ok to left the temp-test folder as is.
 
 ## Project Overview
 
@@ -129,7 +133,7 @@ bun run dist/index.js --mcp-server
 ### Hierarchical Structure
 PPP uses a 3-layer feature hierarchy with specific ID patterns:
 - **Layer 1 Features**: F01, F02, ..., F99
-- **Layer 2 Features**: F0101, F0102, ..., F9999  
+- **Layer 2 Features**: F0101, F0102, ..., F9999
 - **Layer 3 Features**: F010101, F010102, ..., F999999
 - **Tasks/Stories**: T010101, T010102 (under parent features)
 - **Bugs**: B010101, B010102 (under features or tasks)
@@ -198,7 +202,7 @@ PPP uses a 3-layer feature hierarchy with specific ID patterns:
 
 User-facing documentation is now organized as follows:
 - **README.md**: Installation, quick start, basic usage
-- **docs/mcp-setup.md**: Detailed MCP configuration guide  
+- **docs/mcp-setup.md**: Detailed MCP configuration guide
 - **docs/troubleshooting.md**: Common issues and solutions
 - **docs/architecture.md**: Technical implementation details
 

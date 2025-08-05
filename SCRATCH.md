@@ -51,3 +51,23 @@ refactor ppp init command to disable the interactive ui, and just use cli line f
   - remove other 2 parameters, it is useless.
   - revise related settings attributes accordingly.
 
+
+### features for testing
+
+- admin management
+  - 用户管理
+    - 添加用户
+    - 删除用户
+    - 列出所有用户
+    - 修改用户密码
+  - 角色管理
+    - 添加角色
+    - 删除角色
+    - 列出所有角色
+  - permission management
+- common modules
+  - logging
+  - security
+    - authentication
+    - authorization
+
