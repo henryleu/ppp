@@ -107,105 +107,99 @@ src/
 - **Resources**: Read `.ppp/` files (settings.json, SPEC.md, TRACK.md, IMPL.md)
 - **Prompts**: `project_init`, `project_review` - Common workflow templates
 
-### Supported IDEs and Configurations
-PPP supports VSCode-based IDEs and Claude Code (not Claude Desktop).
+### Development Configuration
 
-#### VSCode and VSCode-based IDEs (Cursor, Trae, Cline)
-Create `.vscode/mcp.json` in your workspace:
-```json
-{
-  "servers": {
-    "ppp": {
-      "type": "stdio",
-      "command": "ppp",
-      "args": ["--mcp-server"],
-      "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
-    }
-  }
-}
-```
+The project includes MCP configurations for development:
+- `.vscode/mcp.json` and `.cursor/mcp.json` point to local build commands
+- These use `bun run dist/index.js --mcp-server` for local development
+- For production use, see [docs/mcp-setup.md](docs/mcp-setup.md)
 
-#### Claude Code
-Add to your `~/.claude.json` file:
-```json
-{
-  "mcpServers": {
-    "ppp": {
-      "type": "stdio",
-      "command": "ppp",
-      "args": ["--mcp-server"],
-      "description": "Product Prompt Planner - CLI tool for managing product backlogs, tasks and bugs with AI assistance"
-    }
-  }
-}
-```
-
-
-### Setup Instructions
-
-#### For End Users (Production)
-1. **Install PPP globally**: `npm install -g @ppp/cli`
-2. **Run the setup command**: `ppp setup-mcp`
-3. **Select your IDE(s)** from the interactive menu
-4. **Restart your IDE** to load the MCP server
-5. **Verify installation**: Use `/mcp` command (Claude Code) or check MCP status in your IDE
-
-#### For Developers (Local Development)
-1. **Clone the repository** and run `bun install`
-2. **Build the project**: `bun run build`
-3. **Use the development configurations**:
-   - The included `.vscode/mcp.json` and `.cursor/mcp.json` use local build commands
-   - These point to `bun run dist/index.js --mcp-server` for local development
-4. **Test the MCP server**: `bun run dist/index.js --mcp-server`
-
-### Usage
+### MCP Server Testing
 ```bash
-# Start MCP server mode manually
-ppp --mcp-server
-
-# Or use through your configured IDE
-```
-
-### Troubleshooting
-
-#### Common Issues and Solutions
-
-1. **"PPP is not globally installed" during setup**
-   - Solution: Install PPP globally with `npm install -g @ppp/cli`
-   - Verify installation: `ppp --version`
-
-2. **MCP server not responding in IDE**
-   - Restart your IDE after configuration
-   - Check if PPP is in your PATH: `which ppp`
-   - Test MCP server manually: `ppp --mcp-server`
-
-3. **Configuration file not found**
-   - Ensure you have write permissions to the configuration directory
-   - For VSCode-based IDEs: Check `.vscode/mcp.json` exists in your workspace
-   - For Claude Code: Check `~/.claude.json` exists in your home directory
-
-4. **MCP server starts but tools are not available**
-   - Verify PPP is the correct version: `ppp --version`
-   - Check IDE MCP integration is enabled
-   - Look for error messages in IDE console/logs
-
-5. **Table output displays garbled characters**
-   - This has been fixed in recent versions using ASCII characters
-   - Ensure you're using the latest version: `ppp --version`
-   - Tables now use `+`, `-`, `|` characters for universal compatibility
-
-#### Debug Commands
-```bash
-# Test PPP installation
-ppp --version
-
 # Test MCP server startup
-ppp --mcp-server
+bun run dist/index.js --mcp-server
 
-# Check configuration
-ppp setup-mcp
+# Build and test
+bun run build
+bun run dist/index.js --mcp-server
 ```
 
-### Requirements
-- **Bun**: Install Bun runtime (https://bun.sh)
-- **Dependencies**: Run `bun install` to install packages
+## Issue Management System
+
+### Hierarchical Structure
+PPP uses a 3-layer feature hierarchy with specific ID patterns:
+- **Layer 1 Features**: F01, F02, ..., F99
+- **Layer 2 Features**: F0101, F0102, ..., F9999  
+- **Layer 3 Features**: F010101, F010102, ..., F999999
+- **Tasks/Stories**: T010101, T010102 (under parent features)
+- **Bugs**: B010101, B010102 (under features or tasks)
+
+### File System Design
+- **Robust folder location**: Finds folders by ID prefix, resilient to renames
+- **No stored paths**: Dynamically computes locations using parent relationships
+- **Unicode support**: Full support for Chinese and international characters
+- **Folder consistency**: All issues create folders with `spec.md` files
+
+### Database System
+- **YAML + Markdown**: Hybrid storage with structured metadata and content
+- **Counter-based IDs**: Auto-incrementing counters prevent conflicts
+- **Atomic operations**: Ensures data consistency during updates
+- **Backup system**: Archives deleted issues to `_archived` folder
+
+## Code Conventions
+
+### TypeScript Standards
+- Use strict TypeScript configuration
+- Prefer interfaces over types for object definitions
+- Use async/await over Promises chains
+- Implement proper error handling with try/catch
+
+### File Organization
+- One main export per file
+- Group related functionality in modules
+- Use index.ts files for clean imports
+- Keep CLI commands in separate files
+
+### Error Handling
+- Use custom error classes for different error types
+- Provide actionable error messages to users
+- Log errors appropriately for debugging
+- Handle file system errors gracefully
+
+### Testing Strategy
+- Unit tests for core business logic
+- Integration tests for CLI commands
+- MCP server functionality tests
+- File system operation tests
+
+## Performance Guidelines
+
+### File System Operations
+- Use streaming for large files
+- Batch related operations
+- Cache frequently accessed data
+- Implement proper cleanup
+
+### Memory Management
+- Avoid loading entire directory trees
+- Use generators for large data sets
+- Clean up temporary objects
+- Monitor memory usage in development
+
+## Security Considerations
+
+- Validate all user inputs
+- Sanitize file paths to prevent traversal attacks
+- Secure API key storage in configuration
+- Limit MCP server access scope
+- Never commit sensitive data to repository
+
+## Documentation
+
+User-facing documentation is now organized as follows:
+- **README.md**: Installation, quick start, basic usage
+- **docs/mcp-setup.md**: Detailed MCP configuration guide  
+- **docs/troubleshooting.md**: Common issues and solutions
+- **docs/architecture.md**: Technical implementation details
+
+This file (CLAUDE.md) focuses on AI development context and should not contain end-user documentation.
