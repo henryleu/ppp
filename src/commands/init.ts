@@ -1,7 +1,12 @@
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, writeFile, copyFile } from 'fs/promises';
 import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { createTable } from '../utils/table.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export async function initCommand(options: { name: string, template: string }) {
   console.log('>>> Initializing ppp in current directory...\n');
@@ -10,6 +15,7 @@ export async function initCommand(options: { name: string, template: string }) {
 
   try {
     await mkdir('.ppp', { recursive: true });
+    await mkdir('.ppp/template', { recursive: true });
 
     const settings = {
       name: projectName,
@@ -23,14 +29,15 @@ export async function initCommand(options: { name: string, template: string }) {
     const readmeContent = `# ${projectName}\n\n\n\nThis project is managed by ppp (Product Prompt Planner).\n`;
     await writeFile('.ppp/README.md', readmeContent);
 
-    const trackContent = `# TRACK.md\n\n## Project Tracking\n\n- Created: ${new Date().toLocaleDateString()}\n- Status: Active\n\n## Tasks\n\n- [ ] Initial setup\n`;
-    await writeFile('.ppp/TRACK.md', trackContent);
-
-    const specContent = `# SPEC.md\n\n## Project Specification\n\n### Overview\n\n\n### Requirements\n\n- TBD\n\n### Technical Specifications\n\n- TBD\n`;
-    await writeFile('.ppp/SPEC.md', specContent);
-
-    const implContent = `# IMPL.md\n\n## Implementation Notes\n\n### Architecture\n\n- TBD\n\n### Development Notes\n\n- TBD\n`;
-    await writeFile('.ppp/IMPL.md', implContent);
+    // Copy template files from src/templates/user-ppp to .ppp/template
+    const templateDir = join(__dirname, 'templates/user-ppp');
+    const templateFiles = ['TRACK.md', 'SPEC.md', 'IMPL.md'];
+    
+    for (const file of templateFiles) {
+      const sourcePath = join(templateDir, file);
+      const destPath = join('.ppp/template', file);
+      await copyFile(sourcePath, destPath);
+    }
 
     // Initialize database
     await hybridManager.initialize(projectName);
@@ -44,17 +51,18 @@ export async function initCommand(options: { name: string, template: string }) {
       ['.ppp/settings.json', '[OK] Created'],
       ['.ppp/database.yml', '[OK] Created'],
       ['.ppp/README.md', '[OK] Created'],
-      ['.ppp/TRACK.md', '[OK] Created'],
-      ['.ppp/SPEC.md', '[OK] Created'],
-      ['.ppp/IMPL.md', '[OK] Created']
+      ['.ppp/template/', '[OK] Created'],
+      ['.ppp/template/TRACK.md', '[OK] Created'],
+      ['.ppp/template/SPEC.md', '[OK] Created'],
+      ['.ppp/template/IMPL.md', '[OK] Created']
     );
 
     console.log('\n[OK] ppp initialized successfully!\n');
     console.log(table.toString());
     console.log('\n[INFO] Next steps:');
-    console.log('  - Edit .ppp/SPEC.md to define your project requirements');
-    console.log('  - Use .ppp/TRACK.md to track your progress');
-    console.log('  - Document implementation details in .ppp/IMPL.md');
+    console.log('  - Copy .ppp/template/SPEC.md to define your project requirements');
+    console.log('  - Use .ppp/template/TRACK.md as a template for tracking your progress');
+    console.log('  - Use .ppp/template/IMPL.md as a template for implementation details');
 
   } catch (error) {
     console.error('[ERROR] Error initializing ppp:', error);
