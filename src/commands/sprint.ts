@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import prompts from 'prompts';
 import Table from 'cli-table3';
-import { hybridManager } from '../utils/hybrid-manager.js';
+import { sprintManager } from '../utils/sprint.js';
 import { SprintState } from '../types/sprint.js';
 
 export function createSprintCommand(): Command {
@@ -12,37 +12,38 @@ export function createSprintCommand(): Command {
   sprint
     .command('create')
     .description('Create a new sprint')
-    .argument('[description]', 'Sprint description')
-    .action(async (description?: string) => {
+    .argument('[name]', 'Sprint name')
+    .action(async (name?: string) => {
       try {
-        let sprintDescription = description;
+        let sprintName = name;
         
-        if (!sprintDescription) {
+        if (!sprintName) {
           const response = await prompts({
             type: 'text',
-            name: 'description',
-            message: 'Enter sprint description:',
-            validate: value => value.trim().length > 0 || 'Description is required'
+            name: 'name',
+            message: 'Enter sprint name:',
+            validate: value => value.trim().length > 0 || 'Sprint name is required'
           });
           
-          if (!response.description) {
+          if (!response.name) {
             console.log('Sprint creation cancelled.');
             return;
           }
           
-          sprintDescription = response.description;
+          sprintName = response.name;
         }
         
-        const sprint = await hybridManager.createSprint({
-          description: sprintDescription
+        const sprint = await sprintManager.createSprint({
+          name: sprintName
         });
         
         console.log(`\n✓ Sprint created successfully!\n`);
         console.log(`Sprint: ${sprint.name}`);
-        console.log(`Description: ${sprint.description}`);
+        console.log(`ID: ${sprint.id}`);
         console.log(`Status: ${sprint.state}`);
         console.log(`Start Date: ${new Date(sprint.startDate).toLocaleDateString()}`);
-        console.log(`File: .ppp/${sprint.id}.md`);
+        console.log(`Folder: .ppp/${sprint.id}/`);
+        console.log(`Spec File: .ppp/${sprint.id}/spec.md`);
         
       } catch (error) {
         console.error('Failed to create sprint:', error instanceof Error ? error.message : error);
@@ -57,7 +58,7 @@ export function createSprintCommand(): Command {
     .argument('<sprint_no>', 'Sprint number to activate (e.g., 01, 02)')
     .action(async (sprintNo: string) => {
       try {
-        const success = await hybridManager.activateSprint(sprintNo);
+        const success = await sprintManager.activateSprint(sprintNo);
         
         if (!success) {
           console.error(`Sprint ${sprintNo} not found.`);
@@ -94,7 +95,7 @@ export function createSprintCommand(): Command {
           return;
         }
         
-        const success = await hybridManager.deleteSprint(sprintNo);
+        const success = await sprintManager.deleteSprint(sprintNo);
         
         if (!success) {
           console.error(`Sprint ${sprintNo} not found.`);
@@ -102,7 +103,7 @@ export function createSprintCommand(): Command {
         }
         
         console.log(`\n✓ Sprint ${sprintNo} deleted successfully!\n`);
-        console.log('Sprint file has been moved to .ppp/_archived/');
+        console.log('Sprint folder has been moved to .ppp/_archived/');
         console.log('Sprint assignments have been removed from all issues.');
         console.log('Release.md has been updated.');
         
@@ -119,7 +120,7 @@ export function createSprintCommand(): Command {
     .argument('<sprint_no>', 'Sprint number to complete (e.g., 01, 02)')
     .action(async (sprintNo: string) => {
       try {
-        const success = await hybridManager.completeSprint(sprintNo);
+        const success = await sprintManager.completeSprint(sprintNo);
         
         if (!success) {
           console.error(`Sprint ${sprintNo} not found.`);
@@ -142,7 +143,7 @@ export function createSprintCommand(): Command {
     .description('List all sprints with their status')
     .action(async () => {
       try {
-        const sprints = await hybridManager.getSprints();
+        const sprints = await sprintManager.getAllSprints();
         
         if (sprints.length === 0) {
           console.log('No sprints found. Create one with "ppp sprint create".');
@@ -161,7 +162,7 @@ export function createSprintCommand(): Command {
             statusColor + sprint.state + '\x1b[0m',
             new Date(sprint.startDate).toLocaleDateString(),
             sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : '-',
-            sprint.issues.length.toString(),
+            sprint.issueCount.toString(),
             sprint.velocity.toString()
           ]);
         }
@@ -169,7 +170,7 @@ export function createSprintCommand(): Command {
         console.log('\n' + table.toString());
         
         // Show active sprint separately
-        const activeSprint = await hybridManager.getActiveSprint();
+        const activeSprint = await sprintManager.getActiveSprint();
         if (activeSprint) {
           console.log(`\n🚀 Active Sprint: ${activeSprint.name}`);
           console.log(`   Description: ${activeSprint.description}`);
@@ -192,7 +193,7 @@ export function createSprintCommand(): Command {
     .argument('<sprint_no>', 'Sprint number (e.g., 01, 02)')
     .action(async (issueId: string, sprintNo: string) => {
       try {
-        const success = await hybridManager.addIssueToSprint(issueId, sprintNo);
+        const success = await sprintManager.addIssueToSprint(issueId, sprintNo);
         
         if (!success) {
           console.error(`Sprint ${sprintNo} not found.`);
@@ -201,7 +202,8 @@ export function createSprintCommand(): Command {
         
         console.log(`\n✓ Issue ${issueId} added to Sprint ${sprintNo} successfully!\n`);
         console.log('Issue sprint assignment has been updated.');
-        console.log('Sprint file has been updated.');
+        console.log('Sprint spec file has been updated.');
+        console.log('Issue symlink created in sprint folder.');
         
       } catch (error) {
         console.error('Failed to add issue to sprint:', error instanceof Error ? error.message : error);
@@ -217,7 +219,7 @@ export function createSprintCommand(): Command {
     .argument('<sprint_no>', 'Sprint number (e.g., 01, 02)')
     .action(async (issueId: string, sprintNo: string) => {
       try {
-        const success = await hybridManager.removeIssueFromSprint(issueId, sprintNo);
+        const success = await sprintManager.removeIssueFromSprint(issueId, sprintNo);
         
         if (!success) {
           console.error(`Sprint ${sprintNo} not found.`);
@@ -226,7 +228,8 @@ export function createSprintCommand(): Command {
         
         console.log(`\n✓ Issue ${issueId} removed from Sprint ${sprintNo} successfully!\n`);
         console.log('Issue sprint assignment has been cleared.');
-        console.log('Sprint file has been updated.');
+        console.log('Sprint spec file has been updated.');
+        console.log('Issue symlink removed from sprint folder.');
         
       } catch (error) {
         console.error('Failed to remove issue from sprint:', error instanceof Error ? error.message : error);

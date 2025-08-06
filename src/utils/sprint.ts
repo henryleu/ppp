@@ -18,15 +18,15 @@ export class SprintManager {
     const counters = await databaseManager.getCounters();
     const sprintNo = counters.sprints + 1;
     
-    // Generate sprint ID and name
+    // Generate sprint ID - use provided name or generate default
     const sprintId = generateSprintId(sprintNo);
-    const sprintName = generateSprintName(sprintNo);
+    const sprintName = data.name || generateSprintName(sprintNo);
     
     // Create sprint object
     const sprint: Sprint = {
       id: sprintId,
       name: sprintName,
-      description: data.description,
+      description: data.description || '',
       state: SprintState.PLANNED,
       startDate: data.startDate || new Date().toISOString(),
       issues: [],
@@ -35,8 +35,8 @@ export class SprintManager {
       updatedAt: new Date().toISOString()
     };
     
-    // Create sprint file
-    await fileManager.createSprintFile(sprint);
+    // Create sprint folder
+    await fileManager.createSprintFolder(sprint);
     
     // Update sprint counter
     await databaseManager.updateCounters({ sprints: sprintNo });
@@ -51,10 +51,10 @@ export class SprintManager {
    * Delete a sprint and clean up all references
    */
   public async deleteSprint(sprintNo: string): Promise<boolean> {
-    const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
+    const sprintId = `S${sprintNo.padStart(2, '0')}`;
     
     // Read sprint to check if it exists
-    const sprint = await fileManager.readSprintFile(sprintId);
+    const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
       return false;
     }
@@ -64,8 +64,8 @@ export class SprintManager {
       await this.removeSprintFromIssues(sprint.issues);
     }
     
-    // Delete sprint file (moves to archive)
-    await fileManager.deleteSprintFile(sprintId);
+    // Delete sprint folder (moves to archive)
+    await fileManager.deleteSprintFolder(sprintId);
     
     // Update Release.md
     await this.updateReleaseFile(sprint, 'delete');
@@ -77,10 +77,10 @@ export class SprintManager {
    * Activate a sprint (only one sprint can be active at a time)
    */
   public async activateSprint(sprintNo: string): Promise<boolean> {
-    const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
+    const sprintId = `S${sprintNo.padStart(2, '0')}`;
     
     // Read target sprint
-    const sprint = await fileManager.readSprintFile(sprintId);
+    const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
       return false;
     }
@@ -97,8 +97,8 @@ export class SprintManager {
     sprint.state = SprintState.ACTIVE;
     sprint.updatedAt = new Date().toISOString();
     
-    // Update sprint file
-    await fileManager.updateSprintFile(sprint);
+    // Update sprint spec
+    await fileManager.updateSprintSpec(sprint);
     
     // Set all issues in this sprint to 'In Progress'
     if (sprint.issues.length > 0) {
@@ -115,9 +115,9 @@ export class SprintManager {
    * Complete a sprint
    */
   public async completeSprint(sprintNo: string): Promise<boolean> {
-    const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
+    const sprintId = `S${sprintNo.padStart(2, '0')}`;
     
-    const sprint = await fileManager.readSprintFile(sprintId);
+    const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
       return false;
     }
@@ -138,8 +138,8 @@ export class SprintManager {
       sprint.velocity = completedCount;
     }
     
-    // Update sprint file
-    await fileManager.updateSprintFile(sprint);
+    // Update sprint spec
+    await fileManager.updateSprintSpec(sprint);
     
     // Update Release.md
     await this.updateReleaseFile(sprint, 'complete');
@@ -153,27 +153,32 @@ export class SprintManager {
   public async getAllSprints(): Promise<SprintSummary[]> {
     await fileManager.ensurePppDirectory();
     
-    const { readdir } = await import('fs/promises');
+    const { readdir, stat } = await import('fs/promises');
     const pppPath = fileManager.getPppPath();
     const files = await readdir(pppPath);
     
     const sprintSummaries: SprintSummary[] = [];
     
     for (const file of files) {
-      if (file.startsWith('Sprint-') && file.endsWith('.md')) {
-        const sprintId = file.replace('.md', '');
-        const sprint = await fileManager.readSprintFile(sprintId);
+      if (file.startsWith('S') && file.match(/^S\d{2}$/)) {
+        const filePath = join(pppPath, file);
+        const fileStat = await stat(filePath);
         
-        if (sprint) {
-          sprintSummaries.push({
-            id: sprint.id,
-            name: sprint.name,
-            state: sprint.state,
-            startDate: sprint.startDate,
-            endDate: sprint.endDate,
-            issueCount: sprint.issues.length,
-            velocity: sprint.velocity
-          });
+        if (fileStat.isDirectory()) {
+          const sprintId = file;
+          const sprint = await fileManager.readSprintSpec(sprintId);
+          
+          if (sprint) {
+            sprintSummaries.push({
+              id: sprint.id,
+              name: sprint.name,
+              state: sprint.state,
+              startDate: sprint.startDate,
+              endDate: sprint.endDate,
+              issueCount: sprint.issues.length,
+              velocity: sprint.velocity
+            });
+          }
         }
       }
     }
@@ -186,9 +191,9 @@ export class SprintManager {
    * Add issue to sprint
    */
   public async addIssueToSprint(issueId: string, sprintNo: string): Promise<boolean> {
-    const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
+    const sprintId = `S${sprintNo.padStart(2, '0')}`;
     
-    const sprint = await fileManager.readSprintFile(sprintId);
+    const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
       return false;
     }
@@ -198,8 +203,11 @@ export class SprintManager {
       sprint.issues.push(issueId);
       sprint.updatedAt = new Date().toISOString();
       
-      // Update sprint file
-      await fileManager.updateSprintFile(sprint);
+      // Update sprint spec
+      await fileManager.updateSprintSpec(sprint);
+      
+      // Create symlink for issue in sprint folder
+      await fileManager.createIssueSymlink(sprintId, issueId);
       
       // Update issue's sprint assignment
       await this.updateIssueSprintAssignment(issueId, sprintId);
@@ -212,9 +220,9 @@ export class SprintManager {
    * Remove issue from sprint
    */
   public async removeIssueFromSprint(issueId: string, sprintNo: string): Promise<boolean> {
-    const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
+    const sprintId = `S${sprintNo.padStart(2, '0')}`;
     
-    const sprint = await fileManager.readSprintFile(sprintId);
+    const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
       return false;
     }
@@ -225,8 +233,11 @@ export class SprintManager {
       sprint.issues.splice(index, 1);
       sprint.updatedAt = new Date().toISOString();
       
-      // Update sprint file
-      await fileManager.updateSprintFile(sprint);
+      // Update sprint spec
+      await fileManager.updateSprintSpec(sprint);
+      
+      // Remove symlink for issue from sprint folder
+      await fileManager.removeIssueSymlink(sprintId, issueId);
       
       // Remove issue's sprint assignment
       await this.updateIssueSprintAssignment(issueId, undefined);
@@ -242,7 +253,7 @@ export class SprintManager {
     const sprints = await this.getAllSprints();
     
     for (const sprintSummary of sprints) {
-      const sprint = await fileManager.readSprintFile(sprintSummary.id);
+      const sprint = await fileManager.readSprintSpec(sprintSummary.id);
       if (sprint && isSprintActive(sprint)) {
         return sprint;
       }
@@ -258,7 +269,7 @@ export class SprintManager {
     
     for (const sprintSummary of sprints) {
       if (sprintSummary.state === SprintState.ACTIVE) {
-        const sprint = await fileManager.readSprintFile(sprintSummary.id);
+        const sprint = await fileManager.readSprintSpec(sprintSummary.id);
         if (sprint) {
           sprint.state = SprintState.COMPLETED;
           sprint.endDate = new Date().toISOString();
@@ -270,7 +281,7 @@ export class SprintManager {
             sprint.velocity = completedCount;
           }
           
-          await fileManager.updateSprintFile(sprint);
+          await fileManager.updateSprintSpec(sprint);
         }
       }
     }

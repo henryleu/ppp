@@ -52,6 +52,18 @@ refactor ppp init command to disable the interactive ui, and just use cli line f
   - revise related settings attributes accordingly.
 
 
+### ppp folder structure
+
+- .ppp
+  - template
+    - settings.json
+    - README.md
+    - TRACK.md
+    - SPEC.md
+    - IMPL.md
+  - product
+  - release
+
 ### features for testing
 
 - admin management

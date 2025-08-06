@@ -19,7 +19,8 @@ export interface Sprint {
 }
 
 export interface SprintCreationData {
-  description: string;
+  name: string;
+  description?: string;
   startDate?: string;
 }
 
@@ -61,7 +62,7 @@ export function isSprintEditable(sprint: Sprint): boolean {
 }
 
 export function generateSprintId(counter: number): string {
-  return `Sprint-${counter.toString().padStart(2, '0')}`;
+  return `S${counter.toString().padStart(2, '0')}`;
 }
 
 export function generateSprintName(counter: number): string {

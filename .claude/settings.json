@@ -91,6 +91,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "afplay /System/Library/Sounds/Frog.aiff"
+          },
+          {
+            "type": "command",
             "command": "cat | jq -r '\"display notification \\\"\" + .message + \"\\\" with title \\\"\" + .title + \"\\\" sound name \\\"Frog\\\"\"' | xargs -I {} osascript -e '{}'"
           }
         ]
@@ -102,7 +106,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "osascript -e 'display notification \"task is done.\" with title \"Claude Code\" sound name \"Glass\"'"
+            "command": "afplay /System/Library/Sounds/Glass.aiff"
+          },
+          {
+            "type": "command",
+            "command": "/bin/bash -c \"osascript -e 'display notification \\\"task is done.\\\" with title \\\"Claude Code\\\" sound name \\\"Glass\\\"'\""
           }
         ]
       }

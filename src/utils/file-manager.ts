@@ -2,7 +2,7 @@ import { mkdir, writeFile, readFile, rename, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { fileExists } from './settings.js';
 import { Issue, IssueType, IssueStatus, IssuePriority } from '../types/issue.js';
-import { Sprint } from '../types/sprint.js';
+import { Sprint, SprintState } from '../types/sprint.js';
 import { databaseManager } from './database.js';
 
 export interface FileManagerOptions {
@@ -333,38 +333,97 @@ export class FileManager {
     }
   }
 
-  public async createSprintFile(sprint: Sprint): Promise<string> {
+  public async createSprintFolder(sprint: Sprint): Promise<string> {
     await this.ensurePppDirectory();
 
-    const filePath = join(this.getPppPath(), `${sprint.id}.md`);
-    const content = this.generateSprintContent(sprint);
-    await writeFile(filePath, content);
+    // Create sprint folder
+    const sprintFolderPath = join(this.getPppPath(), sprint.id);
+    await mkdir(sprintFolderPath, { recursive: true });
 
-    return filePath;
+    // Create spec.md file in sprint folder
+    const specFilePath = join(sprintFolderPath, 'spec.md');
+    const content = this.generateSprintContent(sprint);
+    await writeFile(specFilePath, content);
+
+    return sprintFolderPath;
   }
 
-  public async updateSprintFile(sprint: Sprint): Promise<string> {
+  public async updateSprintSpec(sprint: Sprint): Promise<string> {
     await this.ensurePppDirectory();
 
-    const filePath = join(this.getPppPath(), `${sprint.id}.md`);
+    // Update spec.md file in sprint folder
+    const specFilePath = join(this.getPppPath(), sprint.id, 'spec.md');
     const content = this.generateSprintContent(sprint);
-    await writeFile(filePath, content);
+    await writeFile(specFilePath, content);
 
-    return filePath;
+    return specFilePath;
   }
 
-  public async deleteSprintFile(sprintId: string): Promise<void> {
+  public async deleteSprintFolder(sprintId: string): Promise<void> {
     await this.ensurePppDirectory();
 
-    const filePath = join(this.getPppPath(), `${sprintId}.md`);
-    if (await fileExists(filePath)) {
+    const sprintFolderPath = join(this.getPppPath(), sprintId);
+    if (await fileExists(sprintFolderPath)) {
       await this.ensureArchiveDirectory();
       const archivePath = this.getArchivePath();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const archivedName = `${sprintId}-archived-${timestamp}.md`;
+      const archivedName = `${sprintId}-archived-${timestamp}`;
       const archivedPath = join(archivePath, archivedName);
 
-      await rename(filePath, archivedPath);
+      await rename(sprintFolderPath, archivedPath);
+    }
+  }
+
+  public async createIssueSymlink(sprintId: string, issueId: string): Promise<void> {
+    const sprintFolderPath = join(this.getPppPath(), sprintId);
+    const issueFolderPath = await this.getIssueFolderPath(issueId);
+    
+    if (!issueFolderPath) {
+      console.warn(`Issue folder for ${issueId} not found, cannot create symlink`);
+      return;
+    }
+
+    // Extract folder name from the full path
+    const issueFolderName = issueFolderPath.split('/').pop();
+    if (!issueFolderName) {
+      console.warn(`Could not extract folder name from path: ${issueFolderPath}`);
+      return;
+    }
+
+    const symlinkPath = join(sprintFolderPath, issueFolderName);
+
+    try {
+      // Create symbolic link to the issue folder
+      const { symlink } = await import('fs/promises');
+      await symlink(issueFolderPath, symlinkPath, 'dir');
+    } catch (error) {
+      console.warn(`Failed to create symlink for issue ${issueId}:`, error);
+    }
+  }
+
+  public async removeIssueSymlink(sprintId: string, issueId: string): Promise<void> {
+    const sprintFolderPath = join(this.getPppPath(), sprintId);
+    const issueFolderPath = await this.getIssueFolderPath(issueId);
+    
+    if (!issueFolderPath) {
+      return;
+    }
+
+    // Extract folder name from the full path
+    const issueFolderName = issueFolderPath.split('/').pop();
+    if (!issueFolderName) {
+      return;
+    }
+
+    const symlinkPath = join(sprintFolderPath, issueFolderName);
+
+    try {
+      if (await fileExists(symlinkPath)) {
+        const { unlink } = await import('fs/promises');
+        await unlink(symlinkPath);
+      }
+    } catch (error) {
+      console.warn(`Failed to remove symlink for issue ${issueId}:`, error);
     }
   }
 
@@ -389,18 +448,18 @@ export class FileManager {
     }
   }
 
-  public async readSprintFile(sprintId: string): Promise<Sprint | null> {
+  public async readSprintSpec(sprintId: string): Promise<Sprint | null> {
     try {
-      const filePath = join(this.getPppPath(), `${sprintId}.md`);
+      const specFilePath = join(this.getPppPath(), sprintId, 'spec.md');
 
-      if (!(await fileExists(filePath))) {
+      if (!(await fileExists(specFilePath))) {
         return null;
       }
 
-      const content = await readFile(filePath, 'utf-8');
+      const content = await readFile(specFilePath, 'utf-8');
       return this.parseSprintContent(content);
     } catch (error) {
-      console.warn(`Failed to read sprint file for ${sprintId}:`, error);
+      console.warn(`Failed to read sprint spec for ${sprintId}:`, error);
       return null;
     }
   }
@@ -526,18 +585,66 @@ ${issuesSection}
   }
 
   private parseSprintContent(content: string): Sprint {
-    // Similar to parseIssueSpecContent, this is simplified
+    // Parse sprint content from spec.md file
     const lines = content.split('\n');
     const sprint: Partial<Sprint> = {
       issues: []
     };
 
+    // Extract title from first line
+    const titleMatch = content.match(/^# (.+)$/m);
+    if (titleMatch) {
+      sprint.name = titleMatch[1];
+    }
+
+    // Extract description section
+    const descriptionMatch = content.match(/## Description\n\n(.*?)(?=\n\n## |$)/s);
+    if (descriptionMatch) {
+      sprint.description = descriptionMatch[1].trim();
+    }
+
+    // Extract issues section
+    const issuesMatch = content.match(/## Issues\n\n(.*?)$/s);
+    if (issuesMatch) {
+      const issuesSection = issuesMatch[1];
+      const issueLines = issuesSection.split('\n').filter(line => line.startsWith('- [ ]') || line.startsWith('- [x]'));
+      sprint.issues = issueLines.map(line => line.replace(/^- \[[ x]\] /, '').trim()).filter(id => id && id !== 'No issues assigned to this sprint.');
+    }
+
     for (const line of lines) {
       if (line.startsWith('- **ID**:')) {
         sprint.id = line.split(':')[1].trim();
+      } else if (line.startsWith('- **State**:')) {
+        sprint.state = line.split(':')[1].trim() as SprintState;
+      } else if (line.startsWith('- **Start Date**:')) {
+        const dateStr = line.split(':')[1].trim();
+        sprint.startDate = new Date(dateStr).toISOString();
+      } else if (line.startsWith('- **End Date**:')) {
+        const dateStr = line.split(':')[1].trim();
+        if (dateStr !== 'Not set') {
+          sprint.endDate = new Date(dateStr).toISOString();
+        }
+      } else if (line.startsWith('- **Velocity**:')) {
+        sprint.velocity = parseInt(line.split(':')[1].trim());
+      } else if (line.startsWith('- **Created**:')) {
+        const dateStr = line.split(':')[1].trim();
+        sprint.createdAt = new Date(dateStr).toISOString();
+      } else if (line.startsWith('- **Updated**:')) {
+        const dateStr = line.split(':')[1].trim();
+        sprint.updatedAt = new Date(dateStr).toISOString();
       }
-      // ... parse other fields
     }
+
+    // Set default values for required fields if not found
+    sprint.name = sprint.name || 'Unknown Sprint';
+    sprint.description = sprint.description || '';
+    sprint.id = sprint.id || 'Unknown';
+    sprint.state = sprint.state || SprintState.PLANNED;
+    sprint.startDate = sprint.startDate || new Date().toISOString();
+    sprint.velocity = sprint.velocity || 0;
+    sprint.createdAt = sprint.createdAt || new Date().toISOString();
+    sprint.updatedAt = sprint.updatedAt || new Date().toISOString();
+    sprint.issues = sprint.issues || [];
 
     return sprint as Sprint;
   }
