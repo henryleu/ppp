@@ -1,4 +1,4 @@
-export enum SprintState {
+export enum SprintStatus {
   PLANNED = 'planned',
   ACTIVE = 'active',
   COMPLETED = 'completed',
@@ -9,7 +9,7 @@ export interface Sprint {
   id: string;
   name: string;
   description: string;
-  state: SprintState;
+  status: SprintStatus;
   startDate: string;
   endDate?: string;
   issues: string[]; // Issue IDs
@@ -20,13 +20,11 @@ export interface Sprint {
 
 export interface SprintCreationData {
   name: string;
-  description?: string;
-  startDate?: string;
 }
 
 export interface SprintUpdateData {
   description?: string;
-  state?: SprintState;
+  status?: SprintStatus;
   startDate?: string;
   endDate?: string;
 }
@@ -34,7 +32,7 @@ export interface SprintUpdateData {
 export interface SprintSummary {
   id: string;
   name: string;
-  state: SprintState;
+  status: SprintStatus;
   startDate: string;
   endDate?: string;
   issueCount: number;
@@ -42,23 +40,23 @@ export interface SprintSummary {
 }
 
 // Sprint state transitions
-export function canTransitionTo(currentState: SprintState, newState: SprintState): boolean {
-  const validTransitions: Record<SprintState, SprintState[]> = {
-    [SprintState.PLANNED]: [SprintState.ACTIVE],
-    [SprintState.ACTIVE]: [SprintState.COMPLETED],
-    [SprintState.COMPLETED]: [SprintState.ARCHIVED],
-    [SprintState.ARCHIVED]: [] // No transitions from archived
+export function canTransitionTo(currentState: SprintStatus, newState: SprintStatus): boolean {
+  const validTransitions: Record<SprintStatus, SprintStatus[]> = {
+    [SprintStatus.PLANNED]: [SprintStatus.ACTIVE],
+    [SprintStatus.ACTIVE]: [SprintStatus.COMPLETED],
+    [SprintStatus.COMPLETED]: [SprintStatus.ARCHIVED],
+    [SprintStatus.ARCHIVED]: [] // No transitions from archived
   };
-  
+
   return validTransitions[currentState].includes(newState);
 }
 
 export function isSprintActive(sprint: Sprint): boolean {
-  return sprint.state === SprintState.ACTIVE;
+  return sprint.status === SprintStatus.ACTIVE;
 }
 
 export function isSprintEditable(sprint: Sprint): boolean {
-  return sprint.state === SprintState.PLANNED || sprint.state === SprintState.ACTIVE;
+  return sprint.status === SprintStatus.PLANNED || sprint.status === SprintStatus.ACTIVE;
 }
 
 export function generateSprintId(counter: number): string {

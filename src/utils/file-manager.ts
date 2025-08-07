@@ -2,7 +2,7 @@ import { mkdir, writeFile, readFile, rename, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { fileExists } from './settings.js';
 import { Issue, IssueType, IssueStatus, IssuePriority } from '../types/issue.js';
-import { Sprint, SprintState } from '../types/sprint.js';
+import { Sprint, SprintStatus } from '../types/sprint.js';
 import { databaseManager } from './database.js';
 
 export interface FileManagerOptions {
@@ -377,7 +377,7 @@ export class FileManager {
   public async createIssueSymlink(sprintId: string, issueId: string): Promise<void> {
     const sprintFolderPath = join(this.getPppPath(), sprintId);
     const issueFolderPath = await this.getIssueFolderPath(issueId);
-    
+
     if (!issueFolderPath) {
       console.warn(`Issue folder for ${issueId} not found, cannot create symlink`);
       return;
@@ -404,7 +404,7 @@ export class FileManager {
   public async removeIssueSymlink(sprintId: string, issueId: string): Promise<void> {
     const sprintFolderPath = join(this.getPppPath(), sprintId);
     const issueFolderPath = await this.getIssueFolderPath(issueId);
-    
+
     if (!issueFolderPath) {
       return;
     }
@@ -508,7 +508,7 @@ ${commentsSection}
 ## Sprint Details
 
 - **ID**: ${sprint.id}
-- **State**: ${sprint.state}
+- **State**: ${sprint.status}
 - **Start Date**: ${new Date(sprint.startDate).toLocaleDateString()}
 - **End Date**: ${sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : 'Not set'}
 - **Velocity**: ${sprint.velocity}
@@ -615,7 +615,7 @@ ${issuesSection}
       if (line.startsWith('- **ID**:')) {
         sprint.id = line.split(':')[1].trim();
       } else if (line.startsWith('- **State**:')) {
-        sprint.state = line.split(':')[1].trim() as SprintState;
+        sprint.status = line.split(':')[1].trim() as SprintStatus;
       } else if (line.startsWith('- **Start Date**:')) {
         const dateStr = line.split(':')[1].trim();
         sprint.startDate = new Date(dateStr).toISOString();
@@ -639,7 +639,7 @@ ${issuesSection}
     sprint.name = sprint.name || 'Unknown Sprint';
     sprint.description = sprint.description || '';
     sprint.id = sprint.id || 'Unknown';
-    sprint.state = sprint.state || SprintState.PLANNED;
+    sprint.status = sprint.status || SprintStatus.PLANNED;
     sprint.startDate = sprint.startDate || new Date().toISOString();
     sprint.velocity = sprint.velocity || 0;
     sprint.createdAt = sprint.createdAt || new Date().toISOString();

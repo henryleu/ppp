@@ -2,13 +2,13 @@ import { readFile, writeFile, stat, unlink } from 'fs/promises';
 import { join } from 'path';
 import * as yaml from 'js-yaml';
 import { fileExists } from './settings.js';
-import { 
-  PPPDatabase, 
-  DEFAULT_DATABASE, 
-  IssueMetadata, 
-  SprintMetadata, 
-  IssueFilter, 
-  IssueUpdate, 
+import {
+  PPPDatabase,
+  DEFAULT_DATABASE,
+  IssueMetadata,
+  SprintMetadata,
+  IssueFilter,
+  IssueUpdate,
   SprintUpdate,
   DatabaseOperationResult,
   CounterData
@@ -45,7 +45,7 @@ export class DatabaseManager {
   public async initialize(projectName?: string): Promise<void> {
     // Check for existing counters.json file and migrate if found
     await this.migrateFromLegacyCounters();
-    
+
     const database: PPPDatabase = {
       ...DEFAULT_DATABASE,
       metadata: {
@@ -68,14 +68,14 @@ export class DatabaseManager {
    */
   private async migrateFromLegacyCounters(): Promise<void> {
     const legacyCountersPath = join(this.projectRoot, '.ppp', '.counters.json');
-    
+
     if (await fileExists(legacyCountersPath)) {
       try {
         console.log('📦 Migrating counters from .counters.json to database.yml...');
-        
+
         const content = await readFile(legacyCountersPath, 'utf-8');
         const legacyCounters = JSON.parse(content);
-        
+
         // If database doesn't exist yet, we'll set the counters during initialization
         // If it does exist, we'll update the counters
         if (await this.exists()) {
@@ -104,18 +104,18 @@ export class DatabaseManager {
             sprints: legacyCounters.sprints || 0
           };
         }
-        
+
         // Create backup of legacy file before removal
         const backupPath = `${legacyCountersPath}.backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
         const legacyContent = await readFile(legacyCountersPath, 'utf-8');
         await writeFile(backupPath, legacyContent);
-        
+
         // Remove legacy file
         await unlink(legacyCountersPath);
-        
+
         console.log('✅ Counter migration completed successfully!');
         console.log(`📁 Legacy file backed up to: ${backupPath}`);
-        
+
       } catch (error) {
         console.warn('⚠️  Failed to migrate legacy counters:', error);
         // Don't throw - continue with default counters
@@ -142,7 +142,7 @@ export class DatabaseManager {
     try {
       const content = await readFile(this.dbPath, 'utf-8');
       const data = yaml.load(content) as PPPDatabase;
-      
+
       // Validate basic structure
       if (!data.metadata || !data.issues || !data.sprints) {
         throw new Error('Invalid database structure');
@@ -163,7 +163,7 @@ export class DatabaseManager {
     try {
       // Update metadata
       database.metadata.updated = new Date().toISOString();
-      
+
       // Create backup of existing database
       if (await this.exists()) {
         const backupPath = this.dbPath + '.backup';
@@ -180,7 +180,7 @@ export class DatabaseManager {
       });
 
       await writeFile(this.dbPath, yamlContent);
-      
+
       // Update cache
       this.cache = database;
       this.lastModified = Date.now();
@@ -198,7 +198,7 @@ export class DatabaseManager {
 
     if (filter) {
       if (filter.parent_id !== undefined) {
-        issues = issues.filter(issue => 
+        issues = issues.filter(issue =>
           issue.parent_id?.toUpperCase() === filter.parent_id?.toUpperCase()
         );
       }
@@ -215,7 +215,7 @@ export class DatabaseManager {
         issues = issues.filter(issue => issue.sprint_id === filter.sprint_id);
       }
       if (filter.labels && filter.labels.length > 0) {
-        issues = issues.filter(issue => 
+        issues = issues.filter(issue =>
           filter.labels!.some(label => issue.labels.includes(label))
         );
       }
@@ -229,12 +229,12 @@ export class DatabaseManager {
    */
   public async getIssue(id: string): Promise<IssueMetadata | null> {
     const db = await this.load();
-    
+
     // First try direct match for performance
     if (db.issues[id]) {
       return db.issues[id];
     }
-    
+
     // Case-insensitive search
     const lowerCaseId = id.toLowerCase();
     for (const [issueId, issue] of Object.entries(db.issues)) {
@@ -242,7 +242,7 @@ export class DatabaseManager {
         return issue;
       }
     }
-    
+
     return null;
   }
 
@@ -251,10 +251,10 @@ export class DatabaseManager {
    */
   public async createIssue(issue: IssueMetadata): Promise<void> {
     const db = await this.load();
-    
+
     // Add to issues
     db.issues[issue.id] = issue;
-    
+
     // Update parent's children list
     if (issue.parent_id && db.issues[issue.parent_id]) {
       if (!db.issues[issue.parent_id].children.includes(issue.id)) {
@@ -285,11 +285,11 @@ export class DatabaseManager {
   public async updateIssue(id: string, updates: IssueUpdate): Promise<IssueMetadata> {
     const db = await this.load();
     const issue = await this.getIssue(id);
-    
+
     if (!issue) {
       throw new Error(`Issue ${id} not found`);
     }
-    
+
     // Find the actual key in the database (case-sensitive storage)
     const actualId = this.findActualIssueId(db, id);
 
@@ -317,11 +317,11 @@ export class DatabaseManager {
   public async deleteIssue(id: string): Promise<void> {
     const db = await this.load();
     const issue = await this.getIssue(id);
-    
+
     if (!issue) {
       throw new Error(`Issue ${id} not found`);
     }
-    
+
     // Find the actual key in the database (case-sensitive storage)
     const actualId = this.findActualIssueId(db, id);
 
@@ -383,7 +383,7 @@ export class DatabaseManager {
   public async createSprint(sprint: SprintMetadata): Promise<void> {
     const db = await this.load();
     db.sprints[sprint.id] = sprint;
-    
+
     // Add to release
     if (!db.release.sprints.includes(sprint.id)) {
       db.release.sprints.push(sprint.id);
@@ -398,7 +398,7 @@ export class DatabaseManager {
   public async updateSprint(id: string, updates: SprintUpdate): Promise<SprintMetadata> {
     const db = await this.load();
     const sprint = db.sprints[id];
-    
+
     if (!sprint) {
       throw new Error(`Sprint ${id} not found`);
     }
@@ -417,7 +417,7 @@ export class DatabaseManager {
   public async deleteSprint(id: string): Promise<void> {
     const db = await this.load();
     const sprint = db.sprints[id];
-    
+
     if (!sprint) {
       throw new Error(`Sprint ${id} not found`);
     }
@@ -452,7 +452,7 @@ export class DatabaseManager {
     const db = await this.load();
     const issue = await this.getIssue(issueId);
     const sprint = db.sprints[sprintId];
-    
+
     // Find actual issue ID for database operations
     const actualIssueId = this.findActualIssueId(db, issueId);
 
@@ -492,7 +492,7 @@ export class DatabaseManager {
     const db = await this.load();
     const issue = await this.getIssue(issueId);
     const sprint = db.sprints[sprintId];
-    
+
     // Find actual issue ID for database operations
     const actualIssueId = this.findActualIssueId(db, issueId);
 
@@ -542,7 +542,7 @@ export class DatabaseManager {
   public async getActiveSprint(): Promise<SprintMetadata | null> {
     const db = await this.load();
     const sprints = Object.values(db.sprints);
-    return sprints.find(sprint => sprint.state === 'active') || null;
+    return sprints.find(sprint => sprint.status === 'active') || null;
   }
 
   /**
@@ -562,7 +562,7 @@ export class DatabaseManager {
     if (db.issues[id]) {
       return id;
     }
-    
+
     // Case-insensitive search
     const lowerCaseId = id.toLowerCase();
     for (const issueId of Object.keys(db.issues)) {
@@ -570,7 +570,7 @@ export class DatabaseManager {
         return issueId;
       }
     }
-    
+
     // If not found, return the original ID (will cause appropriate errors downstream)
     return id;
   }
@@ -586,12 +586,12 @@ export class DatabaseManager {
   public async backup(): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = `${this.dbPath}.backup-${timestamp}`;
-    
+
     if (await this.exists()) {
       const content = await readFile(this.dbPath, 'utf-8');
       await writeFile(backupPath, content);
     }
-    
+
     return backupPath;
   }
 }

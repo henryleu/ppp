@@ -2,25 +2,23 @@ import { databaseManager } from './database.js';
 import { fileManager } from './file-manager.js';
 import { generateIssueId } from './id-generator.js';
 import { generateIssueNameKeywords } from './llm.js';
-import { 
-  IssueMetadata, 
-  SprintMetadata, 
-  IssueFilter, 
-  IssueUpdate, 
-  SprintUpdate,
-  isValidIssueType,
-  isValidIssueStatus,
-  isValidIssuePriority,
-  isValidSprintState 
+import { fileExists } from './settings.js';
+import { readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
+import {
+  IssueMetadata,
+  SprintMetadata,
+  IssueFilter,
+  IssueUpdate
 } from '../types/database.js';
 import { Issue, IssueCreationData, IssueType, IssueStatus, IssuePriority } from '../types/issue.js';
-import { Sprint, SprintState, SprintCreationData } from '../types/sprint.js';
+import { Sprint, SprintStatus, SprintCreationData, generateSprintId } from '../types/sprint.js';
 
 /**
  * Hybrid manager that coordinates between YAML database (metadata) and markdown files (content)
  */
 export class HybridManager {
-  
+
   /**
    * Initialize database if not exists
    */
@@ -36,10 +34,10 @@ export class HybridManager {
   public async createIssue(data: IssueCreationData): Promise<Issue> {
     // Validate parent relationship (same as before)
     await this.validateParent(data.type, data.parentId);
-    
+
     // Generate issue ID using existing logic
     const id = await generateIssueId(data.type, data.parentId);
-    
+
     // Generate keywords
     let keywords: string;
     try {
@@ -48,9 +46,9 @@ export class HybridManager {
       console.warn('LLM keyword generation failed, using fallback:', error);
       keywords = this.generateFallbackKeywords(data.name);
     }
-    
+
     const now = new Date().toISOString();
-    
+
     // Create metadata for database
     const metadata: IssueMetadata = {
       id,
@@ -58,7 +56,7 @@ export class HybridManager {
       keywords,
       type: data.type as IssueMetadata['type'],
       status: 'new',
-      priority: data.priority === IssuePriority.HIGH ? 'high' : 
+      priority: data.priority === IssuePriority.HIGH ? 'high' :
                data.priority === IssuePriority.LOW ? 'low' : 'medium',
       assignee: data.assignee,
       reporter: data.reporter,
@@ -90,15 +88,15 @@ export class HybridManager {
       folderPath: '',
       comments: []
     };
-    
+
     // Create folder and spec.md file
     const folderPath = await fileManager.createIssueFolder(issue);
     // folder_path no longer stored in database - computed dynamically
     issue.folderPath = folderPath;
-    
+
     // Save metadata to database
     await databaseManager.createIssue(metadata);
-    
+
     return issue;
   }
 
@@ -113,7 +111,7 @@ export class HybridManager {
     }
 
     let keywords = metadata.keywords;
-    
+
     // If name is being updated, regenerate keywords
     if (updates.name && updates.name !== metadata.name) {
       try {
@@ -129,7 +127,7 @@ export class HybridManager {
     if (updates.name) dbUpdates.name = updates.name;
     if (keywords !== metadata.keywords) dbUpdates.keywords = keywords;
     if (updates.priority) {
-      dbUpdates.priority = updates.priority === IssuePriority.HIGH ? 'high' : 
+      dbUpdates.priority = updates.priority === IssuePriority.HIGH ? 'high' :
                           updates.priority === IssuePriority.LOW ? 'low' : 'medium';
     }
     if (updates.assignee !== undefined) dbUpdates.assignee = updates.assignee;
@@ -141,7 +139,7 @@ export class HybridManager {
 
     // Create full issue object for file operations if needed
     const issue: Issue = await this.metadataToIssue(updatedMetadata);
-    
+
     // Update file if name/keywords changed
     if (updates.name || keywords !== metadata.keywords) {
       const oldKeywords = metadata.keywords !== keywords ? metadata.keywords : undefined;
@@ -149,7 +147,7 @@ export class HybridManager {
       // folder_path no longer stored in database - computed dynamically when needed
       issue.folderPath = folderPath;
     }
-    
+
     return issue;
   }
 
@@ -159,10 +157,10 @@ export class HybridManager {
   public async deleteIssue(issueId: string): Promise<void> {
     // Get folder path before deleting from database (since getIssueFolderPath needs database info)
     const folderPath = await fileManager.getIssueFolderPath(issueId);
-    
+
     // Delete from database (handles relationships)
     await databaseManager.deleteIssue(issueId);
-    
+
     // Move folder to archive using the pre-retrieved path
     await fileManager.deleteIssueFolderByPath(issueId, folderPath);
   }
@@ -208,11 +206,11 @@ export class HybridManager {
       // No specific root, get all issues with filtering
       allIssues = await this.listIssues(filter);
     }
-    
+
     // Build hierarchy tree with case-insensitive mapping
     const issueMap = new Map<string, Issue>();
     const childrenMap = new Map<string, Issue[]>();
-    
+
     // Create maps for quick lookup with case-insensitive keys
     allIssues.forEach(issue => {
       issueMap.set(issue.id.toUpperCase(), issue);
@@ -222,12 +220,12 @@ export class HybridManager {
       }
       childrenMap.get(parentKey)!.push(issue);
     });
-    
+
     // Sort children by ID for consistent ordering
     childrenMap.forEach(children => {
       children.sort((a, b) => a.id.localeCompare(b.id));
     });
-    
+
     // Helper function to check if an issue matches the filter
     const matchesFilter = (issue: Issue): boolean => {
       if (!filter) return true;
@@ -236,8 +234,8 @@ export class HybridManager {
       if (filter.assignee && issue.assignee !== filter.assignee) return false;
       if ((filter as any).sprintId && issue.sprintId !== (filter as any).sprintId) return false;
       if (filter.labels && filter.labels.length > 0) {
-        const hasMatchingLabel = filter.labels.some(label => 
-          issue.labels.some(issueLabel => 
+        const hasMatchingLabel = filter.labels.some(label =>
+          issue.labels.some(issueLabel =>
             issueLabel.toLowerCase().includes(label.toLowerCase())
           )
         );
@@ -245,10 +243,10 @@ export class HybridManager {
       }
       return true;
     };
-    
+
     // Traverse hierarchy depth-first to build ordered list
     const result: Issue[] = [];
-    
+
     const traverse = (parentId: string | null, includeParent: boolean = false) => {
       // If includeParent is true and we have a parent issue, add it first
       if (includeParent && parentId) {
@@ -261,7 +259,7 @@ export class HybridManager {
       // Get children using case-insensitive lookup
       const parentKey = parentId ? parentId.toUpperCase() : 'root';
       const children = childrenMap.get(parentKey) || [];
-      
+
       children.forEach((child) => {
         // Apply filter to descendants (but not to root issue if specified)
         const isRootIssue = rootIssue && child.id.toUpperCase() === rootIssue.id.toUpperCase();
@@ -271,13 +269,13 @@ export class HybridManager {
         if (childMatchesFilter) {
           result.push(child);
         }
-        
+
         // Always traverse children to find matching descendants,
         // even if this child doesn't match the filter
         traverse(child.id, false);
       });
     };
-    
+
     // Start traversal from the specified root or from all root issues
     if (rootParentId && rootIssue) {
       // Add the root issue first (always included regardless of filter)
@@ -288,7 +286,7 @@ export class HybridManager {
       // Start from all root issues (no parent)
       traverse(null, false);
     }
-    
+
     return result;
   }
 
@@ -298,7 +296,7 @@ export class HybridManager {
   public async getIssue(issueId: string): Promise<Issue | null> {
     const metadata = await databaseManager.getIssue(issueId);
     if (!metadata) return null;
-    
+
     return this.metadataToIssue(metadata);
   }
 
@@ -320,22 +318,24 @@ export class HybridManager {
    * Create a new sprint
    */
   public async createSprint(data: SprintCreationData): Promise<Sprint> {
+    await fileManager.ensurePppDirectory();
+
     // Get current sprint counter
     const counters = await databaseManager.getCounters();
     const sprintNo = counters.sprints + 1;
-    
-    const sprintId = `Sprint-${sprintNo.toString().padStart(2, '0')}`;
-    const sprintName = `Sprint ${sprintNo.toString().padStart(2, '0')}`;
-    
+
+    // Generate sprint ID - use provided name or generate default
+    const sprintId = generateSprintId(sprintNo);
+    const sprintName = data.name || "new sprint";
+
     const now = new Date().toISOString();
-    
-    // Create metadata for database
+
+    // Create metadata for database (without description field)
     const metadata: SprintMetadata = {
       id: sprintId,
       name: sprintName,
-      description: data.description,
-      state: 'planned',
-      start_date: data.startDate || now.split('T')[0],
+      status: 'planned',
+      start_date: now,
       velocity: 0,
       created_at: now,
       updated_at: now,
@@ -345,23 +345,26 @@ export class HybridManager {
     // Save to database and update counter atomically
     await databaseManager.createSprint(metadata);
     await databaseManager.updateCounters({ sprints: sprintNo });
-    
+
     // Create Sprint object
     const sprint: Sprint = {
       id: sprintId,
       name: sprintName,
-      description: data.description,
-      state: SprintState.PLANNED,
-      startDate: data.startDate || now,
+      description: '',
+      status: SprintStatus.PLANNED,
+      startDate: now,
       issues: [],
       velocity: 0,
       createdAt: now,
       updatedAt: now
     };
 
-    // Create markdown file
-    await fileManager.createSprintFile(sprint);
-    
+    // Create sprint folder with spec.md file
+    await fileManager.createSprintFolder(sprint);
+
+    // Update Release.md (similar to working implementation)
+    await this.updateReleaseFile(sprint, 'create');
+
     return sprint;
   }
 
@@ -379,7 +382,7 @@ export class HybridManager {
   public async getSprint(sprintId: string): Promise<Sprint | null> {
     const metadata = await databaseManager.getSprint(sprintId);
     if (!metadata) return null;
-    
+
     return this.metadataToSprint(metadata);
   }
 
@@ -388,16 +391,16 @@ export class HybridManager {
    */
   public async addIssueToSprint(issueId: string, sprintNo: string): Promise<boolean> {
     const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
-    
+
     try {
       await databaseManager.addIssueToSprint(issueId, sprintId);
-      
+
       // Update sprint markdown file
       const sprint = await this.getSprint(sprintId);
       if (sprint) {
-        await fileManager.updateSprintFile(sprint);
+        await fileManager.updateSprintSpec(sprint);
       }
-      
+
       return true;
     } catch (error) {
       return false;
@@ -411,7 +414,7 @@ export class HybridManager {
   public async getActiveSprint(): Promise<Sprint | null> {
     const metadata = await databaseManager.getActiveSprint();
     if (!metadata) return null;
-    
+
     return this.metadataToSprint(metadata);
   }
 
@@ -420,7 +423,7 @@ export class HybridManager {
    */
   public async activateSprint(sprintNo: string): Promise<boolean> {
     const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
-    
+
     try {
       // Get target sprint
       const targetMetadata = await databaseManager.getSprint(sprintId);
@@ -429,9 +432,9 @@ export class HybridManager {
       // Deactivate all currently active sprints
       const sprints = await databaseManager.getSprints();
       for (const sprint of sprints) {
-        if (sprint.state === 'active') {
+        if (sprint.status === 'active') {
           await databaseManager.updateSprint(sprint.id, {
-            state: 'completed',
+            status: 'completed',
             end_date: new Date().toISOString().split('T')[0],
             velocity: await this.calculateSprintVelocity(sprint.id)
           });
@@ -439,7 +442,7 @@ export class HybridManager {
       }
 
       // Activate target sprint
-      await databaseManager.updateSprint(sprintId, { state: 'active' });
+      await databaseManager.updateSprint(sprintId, { status: 'active' });
       await databaseManager.setCurrentSprint(sprintId);
 
       // Set all issues in this sprint to 'In Progress'
@@ -458,15 +461,15 @@ export class HybridManager {
    */
   public async completeSprint(sprintNo: string): Promise<boolean> {
     const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
-    
+
     try {
       const sprint = await databaseManager.getSprint(sprintId);
       if (!sprint) return false;
 
       const velocity = await this.calculateSprintVelocity(sprintId);
-      
+
       await databaseManager.updateSprint(sprintId, {
-        state: 'completed',
+        status: 'completed',
         end_date: new Date().toISOString().split('T')[0],
         velocity
       });
@@ -488,10 +491,10 @@ export class HybridManager {
    */
   public async deleteSprint(sprintNo: string): Promise<boolean> {
     const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
-    
+
     try {
       await databaseManager.deleteSprint(sprintId);
-      await fileManager.deleteSprintFile(sprintId);
+      await fileManager.deleteSprintFolder(sprintId);
       return true;
     } catch (error) {
       return false;
@@ -523,25 +526,25 @@ export class HybridManager {
       }
       return;
     }
-    
+
     // Check if parent exists
     const parentMetadata = await databaseManager.getIssue(parentId);
     if (!parentMetadata) {
       throw new Error(`Parent issue ${parentId} does not exist. Create the parent first.`);
     }
-    
+
     // Validate hierarchy rules (same logic as before)
     await this.validateHierarchy(type, parentMetadata);
   }
 
   private async validateHierarchy(childType: IssueType, parent: IssueMetadata): Promise<void> {
     const parentPrefix = parent.id[0];
-    
+
     if (childType === IssueType.FEATURE) {
       if (parentPrefix !== 'F') {
         throw new Error(`Features can only be children of other features, not ${parent.type}`);
       }
-      
+
       const parentLevel = this.getFeatureLevel(parent.id);
       if (parentLevel >= 3) {
         throw new Error(`Maximum feature nesting level (3) exceeded. Cannot create child of ${parent.id}`);
@@ -568,14 +571,14 @@ export class HybridManager {
       'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with', 'create', 'add', 'implement',
       'make', 'build', 'develop', 'setup', 'set', 'up', 'new', 'fix', 'update', 'modify', 'change'
     ]);
-    
+
     const words = name
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
       .split(/\s+/)
       .filter(word => word.length > 2 && !commonWords.has(word))
       .slice(0, 4);
-    
+
     return words.join('_');
   }
 
@@ -583,7 +586,7 @@ export class HybridManager {
     // Read content from markdown file if needed
     let description = '';
     let comments: any[] = [];
-    
+
     try {
       const fullIssue = await fileManager.readIssueSpec(metadata.id);
       if (fullIssue) {
@@ -619,8 +622,8 @@ export class HybridManager {
     return {
       id: metadata.id,
       name: metadata.name,
-      description: metadata.description,
-      state: metadata.state as SprintState,
+      description: '', // Description stored in markdown file, not database
+      status: metadata.status as SprintStatus,
       startDate: metadata.start_date,
       endDate: metadata.end_date,
       issues: metadata.issues,
@@ -628,6 +631,84 @@ export class HybridManager {
       createdAt: metadata.created_at,
       updatedAt: metadata.updated_at
     };
+  }
+
+  private async updateReleaseFile(sprint: Sprint, operation: 'create' | 'delete' | 'activate' | 'complete'): Promise<void> {
+    const releasePath = join(fileManager.getPppPath(), 'Release.md');
+
+    let releaseContent = '';
+
+    // Read existing Release.md or create new one
+    if (await fileExists(releasePath)) {
+      releaseContent = await readFile(releasePath, 'utf-8');
+    } else {
+      releaseContent = `# Release Overview\n\n## Release Goal\n\nManage product development through structured sprints.\n\n## Current Sprint\n\nNo active sprint.\n\n## Sprint List\n\n| ID | Status | Start Date | End Date | Issues | Velocity | Name |\n|----|--------|------------|----------|--------|----------|------|\n`;
+    }
+
+    // Update current sprint section
+    if (operation === 'activate') {
+      releaseContent = releaseContent.replace(
+        /## Current Sprint\n\n.*?(?=\n\n##)/s,
+        `## Current Sprint\n\n**${sprint.name}** - ${sprint.description}\n- Status: ${sprint.status}\n- Start Date: ${new Date(sprint.startDate).toLocaleDateString()}\n- Issues: ${sprint.issues.length}`
+      );
+    } else if (operation === 'complete') {
+      releaseContent = releaseContent.replace(
+        /## Current Sprint\n\n.*?(?=\n\n##)/s,
+        `## Current Sprint\n\nNo active sprint.`
+      );
+    }
+
+    // Update sprint list table
+    // First try new format
+    const newFormatRegex = /(\| ID \| Status \| Start Date \| End Date \| Issues \| Velocity \| Name \|\n\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|\n)([\s\S]*?)(?=\n\n|$)/;
+    let match = releaseContent.match(newFormatRegex);
+
+    if (match) {
+      // Handle new format table
+      const tableHeader = match[1];
+      let tableRows = match[2] || '';
+
+      if (operation === 'create') {
+        const newRow = `| ${sprint.id} | ${sprint.status} | ${new Date(sprint.startDate).toLocaleDateString()} | ${sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : '-'} | ${sprint.issues.length} | ${sprint.velocity} | ${sprint.name} |\n`;
+        tableRows = newRow + tableRows;
+      } else if (operation === 'delete') {
+        // Remove the sprint row
+        const lines = tableRows.split('\n');
+        tableRows = lines.filter(line => !line.includes(sprint.id)).join('\n');
+      } else if (operation === 'activate' || operation === 'complete') {
+        // Update the existing row
+        const lines = tableRows.split('\n');
+        const updatedLines = lines.map(line => {
+          if (line.includes(sprint.id)) {
+            return `| ${sprint.id} | ${sprint.status} | ${new Date(sprint.startDate).toLocaleDateString()} | ${sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : '-'} | ${sprint.issues.length} | ${sprint.velocity} | ${sprint.name} |`;
+          }
+          return line;
+        });
+        tableRows = updatedLines.join('\n');
+      }
+
+      releaseContent = releaseContent.replace(newFormatRegex, `${tableHeader}${tableRows}`);
+    } else {
+      // Try old format and migrate to new format
+      const oldFormatRegex = /(\| Sprint \| Status \| Start Date \| End Date \| Issues \| Velocity \|\n\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|\n)([\s\S]*?)(?=\n\n|$)/;
+      match = releaseContent.match(oldFormatRegex);
+
+      if (match) {
+        // Migrate old format to new format
+        const newHeader = `| ID | Status | Start Date | End Date | Issues | Velocity | Name |\n|----|--------|------------|----------|--------|----------|------|\n`;
+        let tableRows = match[2] || '';
+
+        if (operation === 'create') {
+          const newRow = `| ${sprint.id} | ${sprint.status} | ${new Date(sprint.startDate).toLocaleDateString()} | ${sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : '-'} | ${sprint.issues.length} | ${sprint.velocity} | ${sprint.name} |\n`;
+          tableRows = newRow + tableRows;
+        }
+
+        // Replace old table with new format
+        releaseContent = releaseContent.replace(oldFormatRegex, `${newHeader}${tableRows}`);
+      }
+    }
+
+    await writeFile(releasePath, releaseContent);
   }
 }
 

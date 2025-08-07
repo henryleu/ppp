@@ -1,6 +1,6 @@
 # ppp cli tool
 
-ppp (Product Prompt Planner) is command line tool which is used to manage features and track product blacklog, tasks and bugs using well-structured folders and well-documented markdown files for ai assist tools like cursor , trae or claude code.
+ppp (Product Prompt Planner) is command line tool which is used to manage features and product backlog, and track sprint backlogs including stories, tasks and bugs using well-structured folders and well-documented markdown files for ai assist tools like cursor , trae and claude code as effective task prompts.
 
 **Key Features:**
 - **Hierarchical Issue Management**: 3-layer feature structure with tasks and bugs
@@ -9,6 +9,13 @@ ppp (Product Prompt Planner) is command line tool which is used to manage featur
 - **Sprint Management**: Complete sprint lifecycle with issue tracking
 - **Database Integration**: YAML metadata with markdown content files
 - **AI Integration**: MCP server for seamless AI assistant workflows
+
+**Common Concepts:**
+- **Project Object**: the abstract super object that generically represents all the objects for the project management including Products, Releases, Sprints, Issues (Features, Stories, Tasks, Bugs) and so on. Each Project Object has Object Record and Object Folder.
+- **Object Record**: a record represents the structured data part of an Project Object and is stored in a database.yml file (as a yaml file database) in the .ppp project folder. the object record is used for object indexing, searching, status tracking, and facilitating for command line operations. the fields in Object Record are not supposed to be modified in the main markdown file (mainly spec.md ) in the object folder because the information in the main markdown file cannot be easily synced back to object record stored in database.yml file. the fields in Object Record are supposed to be modified only by command line operations.
+- **Object Folder**: a folder represents the unstructured data part of an Project Object that contains all the files and folders related to an Project Object for the project management. It is stored in the .ppp project folder. the spec file in the folder will be fed to LLM/Coding Assist(Claude Code/Cursor/Trae) as a well-described task prompt for coding. the spec file in the folder is the main file for the project object. all the information in the spec file is used for LLM/Coding Assist/AI Agents as user prompt.
+- **Object ID**: unique identifier for an object. it is always with a suffix to distinguish different types of objects plus a fixed digits populated by increment number backed by counters in database.yml file. it is used for object indexing, folder locating and status tracking. it is also used for object folder name and object record file name.
+
 
 ## Building Blocks
 All PPP features are built on top of following building blocks:
@@ -23,7 +30,7 @@ All PPP features are built on top of following building blocks:
 - llm_api_top_p: 1
 
 ### Issue
-**Issue** is the abstraction of any work item in the product backlog. It can be a module/feature, a task, a bug, a story, etc. All the detailed information about an issue is in its **Issue File** which is in the issue's parent folder, or in a **Issue Container Folder** which is in the issue's parent folder. Whether or not being in the **Issue Container Folder** depends on the issue type.
+**Issue** is the abstraction of any work item in the product backlog. It can be a module/feature, a task, a bug, a story, etc. All the detailed information about an issue is in its **Issue File** which is in the issue's parent folder, or in a **Issue Folder** which is in the issue's parent folder. Whether or not being in the **Issue Folder** depends on the issue type.
 
 1. **Issue Attributes**
 - **Issue ID**: Unique identifier for the issue.
@@ -51,7 +58,7 @@ All PPP features are built on top of following building blocks:
     2. **Feature ID**: Features are fixed to be in 3 layers:
       - layer 1 feature IDs gos with prefix plus 2-fixed-digits like F01, F02, ... F99. The F prefix means feature, the 2-digits means layer 1 features (the top-level feature).
       - layer 2 feature IDs gos with prefix plus 4-fixed-digits like F0101, F0101, .. F0199, F1201, F1202, ...F1299. The F prefix means feature, the first 2 digits is an internal ID part that means it is under the layer 1 features (the top-level feature), the last 2 digits is an internal ID part in it parent feature (layer 1 feature).
-      - layer 3 feature IDs gos with prefix plus 6-fixed-digits like F010101, F010102, ...F010199, F010105, F120201. The F prefix means feature, the first 2 digits means it is under a specifc layer 1 feature, the second 2-digits is an internal ID part that means it is under a specific layer 2 feature, the last 2 digits is an internal ID part in its parent layer 2 feature.
+      - layer 3 feature IDs gos with prefix plus 6-fixed-digits like F010101, F010102, ...F010199, F010105, F120201. The F prefix means feature, the first 2 digits means it is under a specific layer 1 feature, the second 2-digits is an internal ID part that means it is under a specific layer 2 feature, the last 2 digits is an internal ID part in its parent layer 2 feature.
 
     3. **User Story/Task ID**: The type of issues must be put under a specific feature doc folder and ID must be prefixed with a specific feature ID's digits part, and also be suffixed with an auto-incremented 2-digits number. i.e. if a user story belongs to a feature F0105, The user story ID goes like T010501, "0105" mean the user story belongs to feature F0105. if a user story belongs to feature F01, The user story ID goes like T0101, "01" mean the user story belongs to feature F01.
 
@@ -85,11 +92,11 @@ All PPP features are built on top of following building blocks:
   - **Issue Filing** is the course of issue creation. It includes issue file/folder name, issue file/folder content which will include issue ID, name, description, issue type, issue priority, issue assignee, issue reporter, issue labels, issue comments, etc.
 
 4. **Issue File** is the file that contains all the issue related info. It is created when issue is created and managed by ppp during issue lifetime. **All issues create folders** for extensibility and consistency.
-- Features: Its path is like `.ppp/<issue_container_folder>/spec.md`. i.e. `F01-admin/spec.md`, `F01-admin/F02-user_management/spec.md`, etc. It should includes all the issue attributes and other details of requirement and implementation in the md file.
+- Features: Its path is like `.ppp/<issue_folder>/spec.md`. i.e. `F01-admin/spec.md`, `F01-admin/F02-user_management/spec.md`, etc. It should includes all the issue attributes and other details of requirement and implementation in the md file.
 - User Stories/Tasks: Its path is like `.ppp/<feature_folder>/<feature_folder>/<task_folder>/spec.md`. i.e. `F01-admin/T01-create_admin_ddl/spec.md`, `F01-admin/F01-user_management/T03-add_user/spec.md` and `F01-admin/F01-user_management/F02-add_user/T05-check_username/spec.md`. It should includes all the issue attributes and other details related the issue type in the md file.
 - Bugs: Its path is like `.ppp/<feature_folder>/<feature_or_task_folder>/<bug_folder>/spec.md`. i.e. `F01-admin/F01-user_management/B03-cannot_load_feature_page/spec.md` and `F01-admin/F01-user_management/F02-add_user/B05-fail_to_submit/spec.md`. It should includes all the issue attributes and bug details in the md file.
 
-5. **Issue Container Folder** is the feature folder that contains all the child issues related to the feature. It is created when feature is created and managed by ppp during feature lifetime. Its path is like `.ppp/<issue_container_folder>`. i.e. `F01_admin`, `F01_admin/F02_user_management`, etc.
+5. **Issue Folder** is the folder that contains the issue spec file and all the child issues related to the feature. It is created when feature is created and managed by ppp during feature lifetime. Its path is like `.ppp/<issue_folder>`. i.e. `F01_admin`, `F01_admin/F02_user_management`, etc.
 
 ### Sprint
 **Sprint** is a time-boxed iteration to deliver a set of issues. All the detailed information about an sprint is in its **Sprint Folder** is located at `.ppp/<sprint_folder>`. i.e. `S01`, `S02`, etc.
@@ -193,7 +200,7 @@ ppp init [options]
 ```
 
 **Options:**
-- `-n, --name <name>` - Project name (default: 'newproject')
+- `-n, --name <name>` - Project name (default: 'new project')
 - `--template <template>` - Project template (currently unused)
 
 **Examples:**
@@ -237,7 +244,7 @@ All the issue related features are under `ppp issue` command.
 #### create issue
 
 ***issue create*** command creates an issue with type, parent and name provided during the command execution. And it uses `create` sub command and goes like `ppp issue create <issue_type> [<parent_issue_id>] [<issue_name>]`.
-- issue_type is requred and must be one of `feature`, `story`, `task`, `bug`.
+- issue_type is required and must be one of `feature`, `story`, `task`, `bug`.
 - if parent_issue_id or issue_name is not provided, it enters interactive-UI model.
   - prompt user to search and select the parent issue if any.
   - show the selected parent issue's info if any, and prompt user to input issue name.
@@ -267,10 +274,10 @@ User stories and tasks are created as folders, nested under the corresponding fe
   `.ppp/F01-<issue_name_keywords>/F02-<issue_name_keywords>/F01-<issue_name_keywords>/B11-<issue_name_keywords>/spec.md`
 
 #### update issue
-***issue update*** command only updates an issue's name, and sync the new issue name and newly generated name keywords to the related places including issue file/folder name, name in issue file, name in its parent's issue list, name in sprint and feature file. Especially emphasize that issue type cannot be changed once it is crreated, so that it can be deleted and recreated. the command uses `update` sub command and goes like `ppp issue update <issue_id> <new_issue_name>`.
+***issue update*** command only updates an issue's name, and sync the new issue name and newly generated name keywords to the related places including issue file/folder name, name in issue file, name in its parent's issue list, name in sprint and feature file. Especially emphasize that issue type cannot be changed once it is created, so that it can be deleted and recreated. the command uses `update` sub command and goes like `ppp issue update <issue_id> <new_issue_name>`.
 
-During **issue updation**, ppp will:
-- use new issue name to genreate name keywords
+During **issue update**, ppp will:
+- use new issue name to generate name keywords
 - update issue file/folder name with new name keywords;
 - update issue name in issue file;
 - update its parent's issue list if any, etc;
@@ -357,6 +364,7 @@ All the sprint related features are under `ppp sprint` command.
 ***sprint create*** command creates a sprint with name provided during the command execution. And it uses `create` sub command and goes like `ppp sprint create <sprint_name>`.
 
 During **sprint creation**, ppp will:
+- generate sprint record in database with new generated sprint ID;
 - generate **Sprint Folder** which is like 'S<NO>', the ID increases starting from 01, 02, 03, .... i.e. .ppp/S01/;
 - create a sprint spec file at `.ppp/S01/spec.md` includes all sprint attributes, issues and their status, assignee, etc;
 - update Release file to add the sprint to the sprint list in release file;
@@ -364,22 +372,23 @@ During **sprint creation**, ppp will:
 If the other detailed sprint attributes or comments needs to be updated, user can directly edit the sprint file.
 
 #### delete sprint
-***sprint delete*** command deletes a sprint with sprint no provided during the command execution. And it uses `delete` sub command and goes like `ppp sprint delete <sprint_no>`.
+***sprint delete*** command deletes a sprint with sprint ID provided during the command execution. And it uses `delete` sub command and goes like `ppp sprint delete <sprint_id>`.
 
-During **sprint updation**, ppp will:
-- update all the issues assigned to the sprint to remove the sprint assignment if the sprint is in progress;
-- delete a sprint file at `.ppp/Sprint-<NO>.md` if found;
+During **sprint deletion**, ppp will:
+- for all issues in the sprint, set status field back to 'New' status if the issue status is 'In Progress', and set sprintId field to undefined;
+- set sprint record's status to 'archived' in database;
+- move a sprint folder at `.ppp/S<NO>/` if found to `.ppp/_archived` folder;
 - update Release file to remove the sprint from the sprint list;
 
 #### activate sprint
-***sprint activate*** command activates a sprint with sprint no provided during the command execution. And it uses `activate` sub command and goes like `ppp sprint activate <sprint_no>`.
+***sprint activate*** command activates a sprint with sprint no provided during the command execution. And it uses `activate` sub command and goes like `ppp sprint activate <sprint_id>`.
 
 During **sprint activation**, ppp will:
 - update Release file to activate the sprint in the sprint list;
 - update all the issues assigned to the sprint to set their status to 'In Progress';
 
 #### add issue to sprint
-***sprint add*** command adds an issue to a sprint with sprint no provided during the command execution. And it uses `add` sub command and goes like `ppp sprint add <issue_id> <sprint_no>`.
+***sprint add*** command adds an issue to a sprint with sprint no provided during the command execution. And it uses `add` sub command and goes like `ppp sprint add <issue_id> <sprint_id>`.
 
 During **sprint add issue**, ppp will:
 - update the issue's sprint assignment to the sprint no in its issue file;
@@ -387,7 +396,7 @@ During **sprint add issue**, ppp will:
 - maintain bidirectional relationship between issue and sprint;
 
 #### remove issue from sprint
-***sprint remove*** command removes an issue from a sprint with sprint no provided during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_no>`.
+***sprint remove*** command removes an issue from a sprint with sprint no provided during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_id>`.
 
 During **sprint remove issue**, ppp will:
 - update the issue's sprint assignment to remove the sprint reference in its issue file;

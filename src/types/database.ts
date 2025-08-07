@@ -41,8 +41,7 @@ export interface IssueMetadata {
 export interface SprintMetadata {
   id: string;
   name: string;
-  description: string; // Keep basic description in metadata
-  state: 'planned' | 'active' | 'completed' | 'archived';
+  status: 'planned' | 'active' | 'completed' | 'archived';
   start_date: string;
   end_date?: string;
   velocity: number;
@@ -109,7 +108,7 @@ export interface IssueUpdate {
 export interface SprintUpdate {
   name?: string;
   description?: string;
-  state?: string;
+  status?: string;
   start_date?: string;
   end_date?: string;
   velocity?: number;
@@ -174,6 +173,6 @@ export function isValidIssuePriority(priority: string): priority is IssueMetadat
   return ['high', 'medium', 'low'].includes(priority);
 }
 
-export function isValidSprintState(state: string): state is SprintMetadata['state'] {
-  return ['planned', 'active', 'completed', 'archived'].includes(state);
+export function isValidSprintState(status: string): status is SprintMetadata['status'] {
+  return ['planned', 'active', 'completed', 'archived'].includes(status);
 }

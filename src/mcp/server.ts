@@ -46,7 +46,7 @@ export async function startMCPServer() {
                 default: "my-project"
               },
               description: {
-                type: "string", 
+                type: "string",
                 description: "Project description",
                 default: "A new ppp project"
               }
@@ -128,10 +128,10 @@ export async function startMCPServer() {
           // Simulate the init command with provided arguments
           const projectName = args?.projectName || "my-project";
           const description = args?.description || "A new ppp project";
-          
+
           // Call the existing init command logic
           await initCommand();
-          
+
           return {
             content: [
               {
@@ -146,7 +146,7 @@ export async function startMCPServer() {
             const pppDir = ".ppp";
             const files = await readdir(pppDir);
             const fileList = files.map(file => `- ${file}`).join("\n");
-            
+
             return {
               content: [
                 {
@@ -171,21 +171,21 @@ export async function startMCPServer() {
           if (!sprintDescription) {
             throw new McpError(ErrorCode.InvalidParams, "Description is required");
           }
-          
+
           const sprint = await sprintManager.createSprint({ description: sprintDescription });
-          
+
           return {
             content: [
               {
                 type: "text",
-                text: `Successfully created ${sprint.name}\n\nDetails:\n- Description: ${sprint.description}\n- Status: ${sprint.state}\n- Start Date: ${new Date(sprint.startDate).toLocaleDateString()}\n- File: .ppp/${sprint.id}.md`
+                text: `Successfully created ${sprint.name}\n\nDetails:\n- Description: ${sprint.description}\n- Status: ${sprint.status}\n- Start Date: ${new Date(sprint.startDate).toLocaleDateString()}\n- File: .ppp/${sprint.id}.md`
               }
             ]
           };
 
         case "ppp_sprint_list":
           const sprints = await sprintManager.getAllSprints();
-          
+
           if (sprints.length === 0) {
             return {
               content: [
@@ -196,16 +196,16 @@ export async function startMCPServer() {
               ]
             };
           }
-          
+
           const activeSprint = await sprintManager.getActiveSprint();
           let sprintList = "All Sprints:\n\n";
-          
+
           for (const sprint of sprints) {
-            sprintList += `- ${sprint.name} (${sprint.state})\n`;
+            sprintList += `- ${sprint.name} (${sprint.status})\n`;
             sprintList += `  Start: ${new Date(sprint.startDate).toLocaleDateString()}\n`;
             sprintList += `  Issues: ${sprint.issueCount}, Velocity: ${sprint.velocity}\n\n`;
           }
-          
+
           if (activeSprint) {
             sprintList += `\nActive Sprint: ${activeSprint.name}\n`;
             sprintList += `Description: ${activeSprint.description}\n`;
@@ -213,7 +213,7 @@ export async function startMCPServer() {
           } else {
             sprintList += "\nNo active sprint.";
           }
-          
+
           return {
             content: [
               {
@@ -228,13 +228,13 @@ export async function startMCPServer() {
           if (!sprintNoActivate) {
             throw new McpError(ErrorCode.InvalidParams, "Sprint number is required");
           }
-          
+
           const activateSuccess = await sprintManager.activateSprint(sprintNoActivate);
-          
+
           if (!activateSuccess) {
             throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintNoActivate} not found`);
           }
-          
+
           return {
             content: [
               {
@@ -249,13 +249,13 @@ export async function startMCPServer() {
           if (!sprintNoComplete) {
             throw new McpError(ErrorCode.InvalidParams, "Sprint number is required");
           }
-          
+
           const completeSuccess = await sprintManager.completeSprint(sprintNoComplete);
-          
+
           if (!completeSuccess) {
             throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintNoComplete} not found`);
           }
-          
+
           return {
             content: [
               {
@@ -281,7 +281,7 @@ export async function startMCPServer() {
     try {
       const pppDir = ".ppp";
       const files = await readdir(pppDir);
-      
+
       const resources = files.map(file => ({
         uri: `ppp:///${file}`,
         name: file,
@@ -298,14 +298,14 @@ export async function startMCPServer() {
   // Read resource content
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
-    
+
     if (!uri.startsWith("ppp:///")) {
       throw new McpError(ErrorCode.InvalidRequest, "Invalid resource URI");
     }
-    
+
     const filename = uri.replace("ppp:///", "");
     const filepath = join(".ppp", filename);
-    
+
     try {
       const content = await readFile(filepath, "utf-8");
       return {
@@ -336,7 +336,7 @@ export async function startMCPServer() {
               required: false
             },
             {
-              name: "description", 
+              name: "description",
               description: "Project description",
               required: false
             }
@@ -359,7 +359,7 @@ export async function startMCPServer() {
       case "project_init":
         const projectName = args?.projectName || "my-project";
         const description = args?.description || "A new ppp project";
-        
+
         return {
           description: "Initialize a new ppp project",
           messages: [
@@ -378,7 +378,7 @@ export async function startMCPServer() {
           description: "Review current ppp project",
           messages: [
             {
-              role: "user", 
+              role: "user",
               content: {
                 type: "text",
                 text: "Please review the current ppp project status. Use the ppp_status tool to check the project structure, then read the key files like settings.json, SPEC.md, and TRACK.md to provide a comprehensive overview."
@@ -395,6 +395,6 @@ export async function startMCPServer() {
   // Start the server
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  
+
   console.error("ppp MCP Server started successfully");
 }
