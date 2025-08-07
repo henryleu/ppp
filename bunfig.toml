@@ -1,0 +1,6 @@
+[build]
+charset = "utf8"
+target = "node"
+
+#[run]
+#encoding = "utf8"

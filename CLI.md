@@ -391,14 +391,27 @@ During **sprint activation**, ppp will:
 ***sprint add*** command adds an issue to a sprint with sprint no provided during the command execution. And it uses `add` sub command and goes like `ppp sprint add <issue_id> <sprint_id>`.
 
 During **sprint add issue**, ppp will:
-- update the issue's sprint assignment to the sprint no in its issue file;
-- update the issue record in the sprint file to add the issue to the sprint's issue list;
+- check if the issue exists, if not, issue warning and exit;
+- check if the sprint exists, if not, issue warning and exit;
+- check if the issue is already assigned to the sprint, if yes, issue warning and exit;
+- check if the issue is already assigned to another sprint, if yes, issue warning and go on;
 - maintain bidirectional relationship between issue and sprint;
+  - update database to set the issue's sprint assignment to the provided sprint ID;
+  - update database to add the issue ID to the sprint's issues (protect duplicate);
+- in the sprint file of the sprint folder, add the issue to the sprint's issue list;
+- in the issue file of the issue folder, update the issue's sprint assignment to the provided sprint ID;
+- in the sprint folder, create a symlink folder to the issue folder with issue folder name as folder name;
 
 #### remove issue from sprint
-***sprint remove*** command removes an issue from a sprint with sprint no provided during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_id>`.
+***sprint remove*** command removes an issue from a sprint with the provided sprint ID during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_id>`.
 
 During **sprint remove issue**, ppp will:
-- update the issue's sprint assignment to remove the sprint reference in its issue file;
-- update the issue record in the sprint file to remove the issue from the sprint's issue list;
-- maintain bidirectional relationship cleanup between issue and sprint;
+- check if the issue exists, if not, issue warning and exit;
+- check if the sprint exists, if not, issue warning and exit;
+- check if the issue is already assigned to the sprint, if not, issue warning and exit;
+- maintain bidirectional relationship between issue and sprint;
+  - update database to unset the issue's sprint assignment if it is set to the provided sprint ID;
+  - update database to remove the issue ID from the sprint's issues if it is in the list;
+- in the sprint file of the sprint folder, remove the issue from the sprint's issue list;
+- in the issue file of the issue folder, update the issue's sprint assignment to None;
+- in the sprint folder, remove the symlink folder to the issue folder if it exists;

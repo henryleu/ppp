@@ -1,4 +1,7 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
+// -*- coding: utf-8 -*-
+// @ts-check
+process.stdout.setDefaultEncoding('utf8');
 
 import { program } from 'commander';
 import { readFileSync } from 'fs';
@@ -69,12 +72,12 @@ if (process.argv.includes('--mcp-server')) {
       const { spawn } = await import('child_process');
       const { join, dirname } = await import('path');
       const { fileURLToPath } = await import('url');
-      
+
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = dirname(__filename);
       const scriptPath = join(__dirname, '..', 'scripts', 'setup-mcp.js');
-      
-      spawn('node', [scriptPath], { 
+
+      spawn('node', [scriptPath], {
         stdio: 'inherit',
         shell: true
       });

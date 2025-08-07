@@ -200,7 +200,7 @@ export function createSprintCommand(): Command {
           process.exit(1);
         }
 
-        console.log(`\n✓ Issue ${issueId} added to Sprint ${sprintNo} successfully!\n`);
+        console.log(`✓ Issue ${issueId} added to Sprint ${sprintNo} successfully!`);
         console.log('Issue sprint assignment has been updated.');
         console.log('Sprint spec file has been updated.');
         console.log('Issue symlink created in sprint folder.');

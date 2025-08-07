@@ -65,7 +65,8 @@ export class SprintManager {
    * Delete a sprint and clean up all references
    */
   public async deleteSprint(sprintNo: string): Promise<boolean> {
-    const sprintId = `S${sprintNo.padStart(2, '0')}`;
+    const normalizedSprintNo = this.normalizeSprintNo(sprintNo);
+    const sprintId = `S${normalizedSprintNo}`;
 
     // Read sprint to check if it exists
     const sprint = await fileManager.readSprintSpec(sprintId);
@@ -91,7 +92,8 @@ export class SprintManager {
    * Activate a sprint (only one sprint can be active at a time)
    */
   public async activateSprint(sprintNo: string): Promise<boolean> {
-    const sprintId = `S${sprintNo.padStart(2, '0')}`;
+    const normalizedSprintNo = this.normalizeSprintNo(sprintNo);
+    const sprintId = `S${normalizedSprintNo}`;
 
     // Read target sprint
     const sprint = await fileManager.readSprintSpec(sprintId);
@@ -129,7 +131,8 @@ export class SprintManager {
    * Complete a sprint
    */
   public async completeSprint(sprintNo: string): Promise<boolean> {
-    const sprintId = `S${sprintNo.padStart(2, '0')}`;
+    const normalizedSprintNo = this.normalizeSprintNo(sprintNo);
+    const sprintId = `S${normalizedSprintNo}`;
 
     const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
@@ -205,7 +208,8 @@ export class SprintManager {
    * Add issue to sprint
    */
   public async addIssueToSprint(issueId: string, sprintNo: string): Promise<boolean> {
-    const sprintId = `S${sprintNo.padStart(2, '0')}`;
+    const normalizedSprintNo = this.normalizeSprintNo(sprintNo);
+    const sprintId = `S${normalizedSprintNo}`;
 
     const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
@@ -234,7 +238,8 @@ export class SprintManager {
    * Remove issue from sprint
    */
   public async removeIssueFromSprint(issueId: string, sprintNo: string): Promise<boolean> {
-    const sprintId = `S${sprintNo.padStart(2, '0')}`;
+    const normalizedSprintNo = this.normalizeSprintNo(sprintNo);
+    const sprintId = `S${normalizedSprintNo}`;
 
     const sprint = await fileManager.readSprintSpec(sprintId);
     if (!sprint) {
@@ -277,6 +282,16 @@ export class SprintManager {
   }
 
   // Private helper methods
+
+  /**
+   * Normalize sprint number input to handle case-insensitive matching
+   * Examples: 's01' → '01', 'S01' → '01', '01' → '01'
+   */
+  private normalizeSprintNo(sprintNo: string): string {
+    // Remove any existing 's' or 'S' prefix and ensure 2-digit padding
+    const cleanNo = sprintNo.replace(/^[sS]/i, '');
+    return cleanNo.padStart(2, '0');
+  }
 
   private async deactivateAllActiveSprints(): Promise<void> {
     const sprints = await this.getAllSprints();
