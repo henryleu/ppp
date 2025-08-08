@@ -92,12 +92,12 @@ export async function startMCPServer() {
           inputSchema: {
             type: "object",
             properties: {
-              sprintNo: {
+              sprintId: {
                 type: "string",
-                description: "Sprint number to activate (e.g., '01', '02')"
+                description: "Sprint ID to activate (e.g., 'S01', '01', '02')"
               }
             },
-            required: ["sprintNo"]
+            required: ["sprintId"]
           }
         },
         {
@@ -106,12 +106,12 @@ export async function startMCPServer() {
           inputSchema: {
             type: "object",
             properties: {
-              sprintNo: {
+              sprintId: {
                 type: "string",
-                description: "Sprint number to complete (e.g., '01', '02')"
+                description: "Sprint ID to complete (e.g., 'S01', '01', '02')"
               }
             },
-            required: ["sprintNo"]
+            required: ["sprintId"]
           }
         }
       ]
@@ -224,43 +224,47 @@ export async function startMCPServer() {
           };
 
         case "ppp_sprint_activate":
-          const sprintNoActivate = args?.sprintNo;
-          if (!sprintNoActivate) {
-            throw new McpError(ErrorCode.InvalidParams, "Sprint number is required");
+          const sprintIdActivate = args?.sprintId;
+          if (!sprintIdActivate) {
+            throw new McpError(ErrorCode.InvalidParams, "Sprint ID is required");
           }
 
-          const activateSuccess = await sprintManager.activateSprint(sprintNoActivate);
+          // Normalize sprint ID following CLI.md rules
+          const normalizedSprintNoActivate = sprintIdActivate.replace(/^[sS]/i, '').padStart(2, '0');
+          const activateSuccess = await sprintManager.activateSprint(normalizedSprintNoActivate);
 
           if (!activateSuccess) {
-            throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintNoActivate} not found`);
+            throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintIdActivate} not found`);
           }
 
           return {
             content: [
               {
                 type: "text",
-                text: `Successfully activated Sprint ${sprintNoActivate}\n\n- All previously active sprints have been completed\n- All issues in this sprint are now "In Progress"\n- Release.md has been updated`
+                text: `Successfully activated Sprint ${sprintIdActivate}\n\n- All previously active sprints have been completed\n- All issues in this sprint are now "In Progress"\n- Release.md has been updated`
               }
             ]
           };
 
         case "ppp_sprint_complete":
-          const sprintNoComplete = args?.sprintNo;
-          if (!sprintNoComplete) {
-            throw new McpError(ErrorCode.InvalidParams, "Sprint number is required");
+          const sprintIdComplete = args?.sprintId;
+          if (!sprintIdComplete) {
+            throw new McpError(ErrorCode.InvalidParams, "Sprint ID is required");
           }
 
-          const completeSuccess = await sprintManager.completeSprint(sprintNoComplete);
+          // Normalize sprint ID following CLI.md rules
+          const normalizedSprintNoComplete = sprintIdComplete.replace(/^[sS]/i, '').padStart(2, '0');
+          const completeSuccess = await sprintManager.completeSprint(normalizedSprintNoComplete);
 
           if (!completeSuccess) {
-            throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintNoComplete} not found`);
+            throw new McpError(ErrorCode.InvalidParams, `Sprint ${sprintIdComplete} not found`);
           }
 
           return {
             content: [
               {
                 type: "text",
-                text: `Successfully completed Sprint ${sprintNoComplete}\n\n- Sprint velocity calculated based on completed issues\n- Release.md has been updated\n- Sprint is now available for archival`
+                text: `Successfully completed Sprint ${sprintIdComplete}\n\n- Sprint velocity calculated based on completed issues\n- Release.md has been updated\n- Sprint is now available for archival`
               }
             ]
           };

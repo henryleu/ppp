@@ -4,6 +4,18 @@ import Table from 'cli-table3';
 import { sprintManager } from '../utils/sprint.js';
 import { SprintStatus } from '../types/sprint.js';
 
+// Utility functions for Object ID normalization following CLI.md rules
+function normalizeObjectId(id: string): string {
+  // Convert Object IDs to uppercase (F01, T010101, B010101, etc.)
+  return id.toUpperCase();
+}
+
+function normalizeSprintId(sprintId: string): string {
+  // Handle Sprint IDs: S01 → 01, s01 → 01, 01 → 01
+  const cleanNo = sprintId.replace(/^[sS]/i, '');
+  return cleanNo.padStart(2, '0');
+}
+
 export function createSprintCommand(): Command {
   const sprint = new Command('sprint');
   sprint.description('Manage sprints - create, activate, delete and track sprint progress');
@@ -55,17 +67,18 @@ export function createSprintCommand(): Command {
   sprint
     .command('activate')
     .description('Activate a sprint (deactivates any currently active sprint)')
-    .argument('<sprint_no>', 'Sprint number to activate (e.g., 01, 02)')
-    .action(async (sprintNo: string) => {
+    .argument('<sprint_id>', 'Sprint ID to activate (e.g., S01, S02, or 01, 02)')
+    .action(async (sprintId: string) => {
       try {
-        const success = await sprintManager.activateSprint(sprintNo);
+        const normalizedSprintNo = normalizeSprintId(sprintId);
+        const success = await sprintManager.activateSprint(normalizedSprintNo);
 
         if (!success) {
-          console.error(`Sprint ${sprintNo} not found.`);
+          console.error(`Sprint ${sprintId} not found.`);
           process.exit(1);
         }
 
-        console.log(`\n✓ Sprint ${sprintNo} activated successfully!\n`);
+        console.log(`\n✓ Sprint ${sprintId} activated successfully!\n`);
         console.log('All previously active sprints have been moved to completed status.');
         console.log('All issues in this sprint have been set to "In Progress" status.');
 
@@ -79,14 +92,14 @@ export function createSprintCommand(): Command {
   sprint
     .command('delete')
     .description('Delete a sprint and remove it from all references')
-    .argument('<sprint_no>', 'Sprint number to delete (e.g., 01, 02)')
-    .action(async (sprintNo: string) => {
+    .argument('<sprint_id>', 'Sprint ID to delete (e.g., S01, S02, or 01, 02)')
+    .action(async (sprintId: string) => {
       try {
         // Confirm deletion
         const response = await prompts({
           type: 'confirm',
           name: 'confirmed',
-          message: `Are you sure you want to delete Sprint ${sprintNo}? This will remove sprint assignments from all issues and archive the sprint file.`,
+          message: `Are you sure you want to delete Sprint ${sprintId}? This will remove sprint assignments from all issues and archive the sprint file.`,
           initial: false
         });
 
@@ -95,14 +108,15 @@ export function createSprintCommand(): Command {
           return;
         }
 
-        const success = await sprintManager.deleteSprint(sprintNo);
+        const normalizedSprintNo = normalizeSprintId(sprintId);
+        const success = await sprintManager.deleteSprint(normalizedSprintNo);
 
         if (!success) {
-          console.error(`Sprint ${sprintNo} not found.`);
+          console.error(`Sprint ${sprintId} not found.`);
           process.exit(1);
         }
 
-        console.log(`\n✓ Sprint ${sprintNo} deleted successfully!\n`);
+        console.log(`\n✓ Sprint ${sprintId} deleted successfully!\n`);
         console.log('Sprint folder has been moved to .ppp/_archived/');
         console.log('Sprint assignments have been removed from all issues.');
         console.log('Release.md has been updated.');
@@ -117,17 +131,18 @@ export function createSprintCommand(): Command {
   sprint
     .command('complete')
     .description('Complete an active sprint')
-    .argument('<sprint_no>', 'Sprint number to complete (e.g., 01, 02)')
-    .action(async (sprintNo: string) => {
+    .argument('<sprint_id>', 'Sprint ID to complete (e.g., S01, S02, or 01, 02)')
+    .action(async (sprintId: string) => {
       try {
-        const success = await sprintManager.completeSprint(sprintNo);
+        const normalizedSprintNo = normalizeSprintId(sprintId);
+        const success = await sprintManager.completeSprint(normalizedSprintNo);
 
         if (!success) {
-          console.error(`Sprint ${sprintNo} not found.`);
+          console.error(`Sprint ${sprintId} not found.`);
           process.exit(1);
         }
 
-        console.log(`\n✓ Sprint ${sprintNo} completed successfully!\n`);
+        console.log(`\n✓ Sprint ${sprintId} completed successfully!\n`);
         console.log('Sprint velocity has been calculated based on completed issues.');
         console.log('Release.md has been updated.');
 
@@ -176,7 +191,7 @@ export function createSprintCommand(): Command {
           console.log(`   Description: ${activeSprint.description}`);
           console.log(`   Issues: ${activeSprint.issues.length}`);
         } else {
-          console.log(`\n💡 No active sprint. Use "ppp sprint activate <sprint_no>" to activate one.`);
+          console.log(`\n💡 No active sprint. Use "ppp sprint activate <sprint_id>" to activate one.`);
         }
 
       } catch (error) {
@@ -190,17 +205,19 @@ export function createSprintCommand(): Command {
     .command('add')
     .description('Add an issue to a sprint')
     .argument('<issue_id>', 'Issue ID to add to sprint')
-    .argument('<sprint_no>', 'Sprint number (e.g., 01, 02)')
-    .action(async (issueId: string, sprintNo: string) => {
+    .argument('<sprint_id>', 'Sprint ID (e.g., S01, S02, or 01, 02)')
+    .action(async (issueId: string, sprintId: string) => {
       try {
-        const success = await sprintManager.addIssueToSprint(issueId, sprintNo);
+        const normalizedIssueId = normalizeObjectId(issueId);
+        const normalizedSprintNo = normalizeSprintId(sprintId);
+        const success = await sprintManager.addIssueToSprint(normalizedIssueId, normalizedSprintNo);
 
         if (!success) {
-          console.error(`Sprint ${sprintNo} not found.`);
+          console.error(`Sprint ${sprintId} not found.`);
           process.exit(1);
         }
 
-        console.log(`✓ Issue ${issueId} added to Sprint ${sprintNo} successfully!`);
+        console.log(`✓ Issue ${normalizedIssueId} added to Sprint ${sprintId} successfully!`);
         console.log('Issue sprint assignment has been updated.');
         console.log('Sprint spec file has been updated.');
         console.log('Issue symlink created in sprint folder.');
@@ -216,17 +233,19 @@ export function createSprintCommand(): Command {
     .command('remove')
     .description('Remove an issue from a sprint')
     .argument('<issue_id>', 'Issue ID to remove from sprint')
-    .argument('<sprint_no>', 'Sprint number (e.g., 01, 02)')
-    .action(async (issueId: string, sprintNo: string) => {
+    .argument('<sprint_id>', 'Sprint ID (e.g., S01, S02, or 01, 02)')
+    .action(async (issueId: string, sprintId: string) => {
       try {
-        const success = await sprintManager.removeIssueFromSprint(issueId, sprintNo);
+        const normalizedIssueId = normalizeObjectId(issueId);
+        const normalizedSprintNo = normalizeSprintId(sprintId);
+        const success = await sprintManager.removeIssueFromSprint(normalizedIssueId, normalizedSprintNo);
 
         if (!success) {
-          console.error(`Sprint ${sprintNo} not found.`);
+          console.error(`Sprint ${sprintId} not found.`);
           process.exit(1);
         }
 
-        console.log(`\n✓ Issue ${issueId} removed from Sprint ${sprintNo} successfully!\n`);
+        console.log(`\n✓ Issue ${normalizedIssueId} removed from Sprint ${sprintId} successfully!\n`);
         console.log('Issue sprint assignment has been cleared.');
         console.log('Sprint spec file has been updated.');
         console.log('Issue symlink removed from sprint folder.');
