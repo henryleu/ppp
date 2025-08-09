@@ -155,6 +155,11 @@ export function createIssueCommand(): Command {
         console.log(`Keywords: ${updatedIssue.keywords}`);
         console.log(`Status: ${updatedIssue.status}`);
         console.log(`Priority: ${updatedIssue.priority}`);
+        
+        // Show folder path if name was updated (indicates potential folder change)
+        if (name && updatedIssue.folderPath) {
+          console.log(`Folder: ${updatedIssue.folderPath}`);
+        }
       } catch (error) {
         console.error(`[ERROR] Failed to update issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);

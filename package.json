@@ -14,7 +14,10 @@
     "dev:config": "bun --watch src/index.ts -- config",
     "start": "bun run dist/index.js",
     "inst": "npm i -g .",
-    "postinstall": "bun run dist/post-install.js"
+    "postinstall": "bun run dist/post-install.js",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:llm": "bun test src/utils/__tests__/llm.test.ts"
   },
   "keywords": [
     "cli",

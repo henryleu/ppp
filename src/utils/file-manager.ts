@@ -9,6 +9,16 @@ export interface FileManagerOptions {
   projectRoot?: string;
 }
 
+interface SpecSections {
+  title: string;
+  customPreIssueDetails: string;
+  issueDetails: string;
+  description: string;
+  customSections: Map<string, string>;
+  comments: string;
+  children: string;
+}
+
 export class FileManager {
   private projectRoot: string;
 
@@ -221,7 +231,7 @@ export class FileManager {
 
     // Create spec.md file
     const specPath = join(folderPath, 'spec.md');
-    const specContent = this.generateIssueSpecContent(issue);
+    const specContent = await this.generateIssueSpecContent(issue);
     await writeFile(specPath, specContent);
 
     return folderPath;
@@ -230,10 +240,92 @@ export class FileManager {
   public async updateIssueFolder(issue: Issue, oldKeywords?: string): Promise<string> {
     await this.ensurePppDirectory();
 
+    console.debug(`[DEBUG] updateIssueFolder: ${issue.id} (${issue.name}) - keywords: ${issue.keywords}`);
+
     // Always find the existing folder first using issue ID
     const currentFolderPath = await this.getIssueFolderPath(issue.id);
+    console.debug(`[DEBUG] Current folder path: ${currentFolderPath}`);
 
     let newFolderPath: string;
+    try {
+      newFolderPath = await this.generateIssueFolderPath(issue);
+      console.debug(`[DEBUG] Generated new folder path: ${newFolderPath}`);
+    } catch (error) {
+      console.warn(`[WARNING] Failed to generate folder path for ${issue.id}:`, error);
+      // If we have an existing folder, use it as fallback
+      if (currentFolderPath) {
+        newFolderPath = currentFolderPath;
+        console.warn(`[WARNING] Using existing folder as fallback: ${currentFolderPath}`);
+      } else {
+        // Create a fallback path only if no existing folder
+        const folderName = this.generateFolderName(issue.id, issue.keywords);
+        newFolderPath = join(this.getPppPath(), folderName);
+        console.warn(`[WARNING] Creating fallback folder: ${newFolderPath}`);
+      }
+    }
+
+    let actualFolderPath = newFolderPath;
+
+    // Always try to rename existing folder when we have the current path
+    if (currentFolderPath && await fileExists(currentFolderPath)) {
+      // We have an existing folder - rename it if path is different
+      if (currentFolderPath !== newFolderPath) {
+        console.debug(`[DEBUG] Attempting to rename: ${currentFolderPath} → ${newFolderPath}`);
+        try {
+          await rename(currentFolderPath, newFolderPath);
+          console.debug(`[DEBUG] Folder renamed successfully`);
+        } catch (error) {
+          console.error(`[ERROR] Failed to rename folder ${currentFolderPath} to ${newFolderPath}:`, error);
+          // Use current path if rename fails
+          actualFolderPath = currentFolderPath;
+          console.warn(`[WARNING] Keeping original folder: ${currentFolderPath}`);
+        }
+      } else {
+        console.debug(`[DEBUG] Folder path unchanged: ${currentFolderPath}`);
+      }
+      actualFolderPath = newFolderPath;
+    } else if (!(await fileExists(newFolderPath))) {
+      // No existing folder and new path doesn't exist, create it
+      console.debug(`[DEBUG] Creating new folder: ${newFolderPath}`);
+      await mkdir(newFolderPath, { recursive: true });
+      actualFolderPath = newFolderPath;
+    }
+
+    // Ensure the folder exists (in case it was renamed to an existing path)
+    if (!(await fileExists(actualFolderPath))) {
+      await mkdir(actualFolderPath, { recursive: true });
+    }
+
+    // Update spec.md file preserving existing content
+    const specPath = join(actualFolderPath, 'spec.md');
+    let specContent: string;
+    
+    // Try to read existing content to preserve custom sections
+    try {
+      const existingContent = await readFile(specPath, 'utf-8');
+      specContent = await this.generatePreservedIssueSpecContent(issue, existingContent);
+    } catch (error) {
+      // File doesn't exist or can't be read, use standard generation
+      console.debug(`[DEBUG] Could not read existing spec.md, using standard generation: ${error}`);
+      specContent = await this.generateIssueSpecContent(issue);
+    }
+    
+    await writeFile(specPath, specContent);
+
+    return actualFolderPath;
+  }
+
+  /**
+   * Update issue folder with children data from database
+   * This method gets both issue and children data from database to ensure consistency
+   */
+  public async updateIssueFolderWithChildren(issue: Issue, childrenIds: string[], oldKeywords?: string): Promise<string> {
+    await this.ensurePppDirectory();
+
+    // Always find the existing folder first using issue ID
+    const currentFolderPath = await this.getIssueFolderPath(issue.id);
+    let newFolderPath: string;
+
     try {
       newFolderPath = await this.generateIssueFolderPath(issue);
     } catch (error) {
@@ -252,11 +344,19 @@ export class FileManager {
 
     // Always try to rename existing folder when we have the current path
     if (currentFolderPath && await fileExists(currentFolderPath)) {
-      // We have an existing folder - rename it if path is different
       if (currentFolderPath !== newFolderPath) {
-        await rename(currentFolderPath, newFolderPath);
+        // Only rename if paths differ and new path doesn't exist
+        if (!(await fileExists(newFolderPath))) {
+          await rename(currentFolderPath, newFolderPath);
+          actualFolderPath = newFolderPath;
+        } else {
+          // Use existing folder if new path already exists
+          actualFolderPath = currentFolderPath;
+        }
+      } else {
+        // Paths are same, use current path
+        actualFolderPath = currentFolderPath;
       }
-      actualFolderPath = newFolderPath;
     } else if (!(await fileExists(newFolderPath))) {
       // No existing folder and new path doesn't exist, create it
       await mkdir(newFolderPath, { recursive: true });
@@ -268,9 +368,20 @@ export class FileManager {
       await mkdir(actualFolderPath, { recursive: true });
     }
 
-    // Update spec.md file
+    // Update spec.md file with children data preserving existing content
     const specPath = join(actualFolderPath, 'spec.md');
-    const specContent = this.generateIssueSpecContent(issue);
+    let specContent: string;
+    
+    // Try to read existing content to preserve custom sections
+    try {
+      const existingContent = await readFile(specPath, 'utf-8');
+      specContent = await this.generatePreservedIssueSpecContent(issue, existingContent, childrenIds);
+    } catch (error) {
+      // File doesn't exist or can't be read, use standard generation
+      console.debug(`[DEBUG] Could not read existing spec.md, using standard generation: ${error}`);
+      specContent = await this.generateIssueSpecContent(issue, childrenIds);
+    }
+    
     await writeFile(specPath, specContent);
 
     return actualFolderPath;
@@ -478,11 +589,15 @@ export class FileManager {
     }
   }
 
-  private generateIssueSpecContent(issue: Issue): string {
+  private async generateIssueSpecContent(issue: Issue, childrenIds?: string[]): Promise<string> {
     const commentsSection = issue.comments.length > 0
       ? `\n\n## Comments\n\n${issue.comments.map(comment =>
           `### ${comment.author} - ${new Date(comment.createdAt).toLocaleDateString()}\n${comment.content}`
         ).join('\n\n')}`
+      : '';
+
+    const childrenSection = childrenIds && childrenIds.length >= 0
+      ? `\n\n## Children\n\n${await this.generateChildrenLinksSection(childrenIds)}`
       : '';
 
     return `# ${issue.name}
@@ -504,12 +619,169 @@ export class FileManager {
 ## Description
 
 ${issue.description || 'No description provided.'}
-
-## Keywords
-
-${issue.keywords}
 ${commentsSection}
+${childrenSection}
 `;
+  }
+
+  /**
+   * Generate spec content preserving existing custom content
+   * Only updates title and Issue Details while preserving everything else
+   */
+  private async generatePreservedIssueSpecContent(issue: Issue, existingContent: string, childrenIds?: string[]): Promise<string> {
+    // Parse existing content into sections
+    const sections = this.parseSpecContent(existingContent);
+    
+    // Update title
+    sections.title = issue.name;
+    
+    // Update Issue Details section
+    sections.issueDetails = `- **ID**: ${issue.id}
+- **Type**: ${issue.type}
+- **Status**: ${issue.status}
+- **Priority**: ${issue.priority}
+- **Assignee**: ${issue.assignee || 'Unassigned'}
+- **Reporter**: ${issue.reporter || 'Unknown'}
+- **Labels**: ${issue.labels.join(', ') || 'None'}
+- **Parent**: ${issue.parentId || 'None'}
+- **Sprint**: ${issue.sprintId || 'None'}
+- **Created**: ${new Date(issue.createdAt).toLocaleDateString()}
+- **Updated**: ${new Date(issue.updatedAt).toLocaleDateString()}`;
+
+    // Update Children section if provided
+    if (childrenIds && childrenIds.length >= 0) {
+      sections.children = await this.generateChildrenLinksSection(childrenIds);
+    }
+
+    // Reconstruct the content preserving custom sections
+    return this.reconstructSpecContent(sections);
+  }
+
+  /**
+   * Parse spec.md content into sections
+   */
+  private parseSpecContent(content: string): SpecSections {
+    const lines = content.split('\n');
+    const sections: SpecSections = {
+      title: '',
+      customPreIssueDetails: '',
+      issueDetails: '',
+      description: '',
+      customSections: new Map(),
+      comments: '',
+      children: ''
+    };
+
+    let currentSection: string | null = null;
+    let currentContent: string[] = [];
+    let foundIssueDetails = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.startsWith('# ')) {
+        // Title line
+        sections.title = line.substring(2);
+        continue;
+      }
+
+      if (line.startsWith('## ')) {
+        // Save previous section
+        if (currentSection) {
+          this.saveSection(sections, currentSection, currentContent.join('\n').trim(), foundIssueDetails);
+        }
+
+        // Start new section
+        currentSection = line.substring(3);
+        currentContent = [];
+        
+        if (currentSection === 'Issue Details') {
+          foundIssueDetails = true;
+        }
+        continue;
+      }
+
+      // If we haven't found Issue Details yet and we have content, it's custom pre-Issue Details content
+      if (!foundIssueDetails && !currentSection && line.trim()) {
+        sections.customPreIssueDetails += (sections.customPreIssueDetails ? '\n' : '') + line;
+        continue;
+      }
+
+      // Collect content for current section
+      if (currentSection) {
+        currentContent.push(line);
+      }
+    }
+
+    // Save final section
+    if (currentSection) {
+      this.saveSection(sections, currentSection, currentContent.join('\n').trim(), foundIssueDetails);
+    }
+
+    return sections;
+  }
+
+  /**
+   * Save parsed section content
+   */
+  private saveSection(sections: SpecSections, sectionName: string, content: string, foundIssueDetails: boolean): void {
+    switch (sectionName) {
+      case 'Issue Details':
+        sections.issueDetails = content;
+        break;
+      case 'Description':
+        sections.description = content;
+        break;
+      case 'Comments':
+        sections.comments = content;
+        break;
+      case 'Children':
+        sections.children = content;
+        break;
+      default:
+        // Custom section
+        sections.customSections.set(sectionName, content);
+        break;
+    }
+  }
+
+  /**
+   * Reconstruct spec content from sections
+   */
+  private reconstructSpecContent(sections: SpecSections): string {
+    let content = `# ${sections.title}`;
+
+    // Add custom pre-Issue Details content if it exists
+    if (sections.customPreIssueDetails.trim()) {
+      content += '\n\n' + sections.customPreIssueDetails;
+    }
+
+    // Always add Issue Details
+    content += '\n\n## Issue Details\n\n' + sections.issueDetails;
+
+    // Add Description if it exists
+    if (sections.description) {
+      content += '\n\n## Description\n\n' + sections.description;
+    }
+
+    // Add custom sections in the order they appeared
+    for (const [sectionName, sectionContent] of sections.customSections) {
+      if (sectionContent.trim()) {
+        content += `\n\n## ${sectionName}\n\n${sectionContent}`;
+      }
+    }
+
+    // Add Comments if they exist
+    if (sections.comments) {
+      content += '\n\n## Comments\n\n' + sections.comments;
+    }
+
+    // Add Children if they exist
+    if (sections.children) {
+      content += '\n\n## Children\n\n' + sections.children;
+    }
+
+    return content + '\n';
   }
 
   /**
@@ -529,6 +801,33 @@ ${commentsSection}
     
     const issueLinks = await Promise.all(linkPromises);
     return issueLinks.join('\n');
+  }
+
+  /**
+   * Generate markdown links for child issues in issue spec.md
+   * Creates clickable links that point directly to child issue folders
+   */
+  private async generateChildrenLinksSection(childrenIds: string[]): Promise<string> {
+    if (childrenIds.length === 0) {
+      return '*No child issues found.*';
+    }
+
+    const linkPromises = childrenIds.map(async (childId) => {
+      const childFolderPath = await this.getIssueFolderPath(childId);
+      if (!childFolderPath) {
+        return `- [${childId}](${childId}/spec.md) *(not found)*`;
+      }
+      
+      const folderName = childFolderPath.split('/').pop();
+      if (!folderName) {
+        return `- [${childId}](${childId}/spec.md) *(folder error)*`;
+      }
+      
+      return `- [${folderName}](${folderName}/spec.md)`;
+    });
+    
+    const childLinks = await Promise.all(linkPromises);
+    return childLinks.join('\n');
   }
 
   private async generateSprintContent(sprint: Sprint): Promise<string> {

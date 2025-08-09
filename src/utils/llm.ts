@@ -66,7 +66,7 @@ export function getStringDisplayLength(text: string): number {
 export function sanitizeKeywords(keywords: string): string {
   const sanitized = keywords
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s-]/gu, '') // Remove special chars except Unicode letters, numbers, spaces and hyphens
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ') // Replace special chars with spaces (except Unicode letters, numbers, spaces and hyphens)
     .replace(/\s+/g, '_') // Replace spaces with underscores
     .replace(/-+/g, '_') // Replace hyphens with underscores
     .replace(/_+/g, '_') // Replace multiple underscores with single
@@ -96,14 +96,12 @@ export function sanitizeKeywords(keywords: string): string {
 function countMeaningfulWords(issueName: string): number {
   const commonWords = new Set([
     'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it',
-    'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with', 'create', 'add', 'implement',
-    'make', 'build', 'develop', 'setup', 'set', 'up', 'new', 'fix', 'update', 'modify', 'change'
+    'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with'
   ]);
 
   // Chinese common words
   const chineseCommonWords = new Set([
-    '的', '了', '是', '在', '有', '和', '与', '或', '但', '而', '从', '到', '为', '以', '对', '将',
-    '创建', '添加', '实现', '制作', '构建', '开发', '设置', '新的', '修复', '更新', '修改', '改变'
+    '的', '了', '是', '在', '有', '和', '与', '或', '但', '而', '从', '到', '为', '以', '对', '将'
   ]);
 
   // If text contains Chinese, handle it differently
@@ -206,14 +204,12 @@ Shortened keywords:`;
 export function generateFallbackKeywords(issueName: string): string {
   const commonWords = new Set([
     'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it',
-    'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with', 'create', 'add', 'implement',
-    'make', 'build', 'develop', 'setup', 'set', 'up', 'new', 'fix', 'update', 'modify', 'change'
+    'its', 'of', 'on', 'that', 'the', 'to', 'was', 'will', 'with'
   ]);
 
   // Chinese common words
   const chineseCommonWords = new Set([
-    '的', '了', '是', '在', '有', '和', '与', '或', '但', '而', '从', '到', '为', '以', '对', '将',
-    '创建', '添加', '实现', '制作', '构建', '开发', '设置', '新的', '修复', '更新', '修改', '改变'
+    '的', '了', '是', '在', '有', '和', '与', '或', '但', '而', '从', '到', '为', '以', '对', '将'
   ]);
 
   let words: string[];

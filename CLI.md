@@ -36,7 +36,10 @@ ppp (Product Prompt Planner) is command line tool which is used to manage featur
   - Spec.md files automatically updated after database operations
   - Symlinks created/removed based on database state
   - Markdown content reflects current database relationships
-  - File system serves as synchronized representation of database truth
+  - **Folder names updated** when issue names change via issue update command
+  - **Children sections** automatically updated in parent issue files
+  - **Bidirectional relationships** maintained between issues and sprints
+  - Real-time synchronization ensures file system always matches database state
 
 ## Building Blocks
 All PPP features are built on top of following building blocks:
@@ -116,6 +119,29 @@ All PPP features are built on top of following building blocks:
 - Features: Its path is like `.ppp/<issue_folder>/spec.md`. i.e. `F01-admin/spec.md`, `F01-admin/F02-user_management/spec.md`, etc. It should includes all the issue attributes and other details of requirement and implementation in the md file.
 - User Stories/Tasks: Its path is like `.ppp/<feature_folder>/<feature_folder>/<task_folder>/spec.md`. i.e. `F01-admin/T01-create_admin_ddl/spec.md`, `F01-admin/F01-user_management/T03-add_user/spec.md` and `F01-admin/F01-user_management/F02-add_user/T05-check_username/spec.md`. It should includes all the issue attributes and other details related the issue type in the md file.
 - Bugs: Its path is like `.ppp/<feature_folder>/<feature_or_task_folder>/<bug_folder>/spec.md`. i.e. `F01-admin/F01-user_management/B03-cannot_load_feature_page/spec.md` and `F01-admin/F01-user_management/F02-add_user/B05-fail_to_submit/spec.md`. It should includes all the issue attributes and bug details in the md file.
+
+**Issue File Structure:**
+Each issue file contains:
+- Issue details (ID, type, status, priority, assignee, etc.)
+- Description
+- Comments section (if any)
+- **Children section** - automatically generated list of child issues with clickable links
+
+**Children Section:**
+The Children section appears at the bottom of each issue's spec.md file and contains:
+- **Automatic updates**: Automatically updated when children are added/removed
+- **Clickable links**: Each child listed as markdown link to its spec.md
+- **Real-time sync**: Reflects current database state, not cached data
+- **Hierarchical navigation**: Enables quick navigation to child issues
+
+**Example Children section:**
+```markdown
+## Children
+
+- [T0101-create-admin-ddl](T01-create-admin-ddl/spec.md)
+- [T0102-setup-authentication](T02-setup-authentication/spec.md)
+- [F0103-user-management](F03-user-management/spec.md)
+```
 
 5. **Issue Folder** is the folder that contains the issue spec file and all the child issues related to the feature. It is created when feature is created and managed by ppp during feature lifetime. Its path is like `.ppp/<issue_folder>`. i.e. `F01_admin`, `F01_admin/F02_user_management`, etc.
 
@@ -312,15 +338,64 @@ User stories and tasks are created as folders, nested under the corresponding fe
   `.ppp/F01-<issue_name_keywords>/F02-<issue_name_keywords>/F01-<issue_name_keywords>/B11-<issue_name_keywords>/spec.md`
 
 #### update issue
-***issue update*** command only updates an issue's name, and sync the new issue name and newly generated name keywords to the related places including issue file/folder name, name in issue file, name in its parent's issue list, name in sprint and feature file. Especially emphasize that issue type cannot be changed once it is created, so that it can be deleted and recreated. the command uses `update` sub command and goes like `ppp issue update <issue_id> <new_issue_name>`.
+***issue update*** command updates an issue's name and automatically synchronizes the new issue name and newly generated name keywords to all related places including issue file/folder name, name in issue file, name in its parent's issue list, name in sprint and feature file. **Issue type cannot be changed once it is created**, so that it can be deleted and recreated. The command uses `update` sub command and goes like `ppp issue update <issue_id> <new_issue_name>`.
 
 During **issue update**, ppp will:
 - use new issue name to generate name keywords
-- update issue file/folder name with new name keywords;
-- update issue name in issue file;
-- update its parent's issue list if any, etc;
-- update Feature Bill if the updated issue is a module/feature;
-- update Sprint file if the issue has been assigned to a sprint;
+- **update issue folder name** with new name keywords (folder is renamed to reflect new name)
+- update issue name in issue file
+- update its parent's issue list if any, etc
+- update Feature Bill if the updated issue is a module/feature
+- update Sprint file if the issue has been assigned to a sprint
+- update Children section in parent issue files if parent-child relationships exist
+
+**Folder Updates Verification:**
+The issue update command **always updates folder names** to match the new issue name. However, due to the robust folder location system, these updates may not be immediately obvious. To verify that folder updates occurred:
+
+1. **Check command output** - The update command displays the new folder path
+2. **Verify folder location** - Use `ls -la .ppp/` to see the updated folder name
+3. **Check folder contents** - Verify the spec.md file contains the updated name
+4. **Use issue list** - Run `ppp issue list` to see the current folder structure
+
+**Example folder update process:**
+```bash
+# Original issue: F01-old-feature-name
+ppp issue update F01 "Enhanced User Authentication"
+# Folder will be renamed from: .ppp/F01-old-feature-name/
+# To: .ppp/F01-enhanced-user-authentication/
+# Command output will show: "Updated issue F01 folder: .ppp/F01-enhanced-user-authentication"
+```
+
+**Verification commands after update:**
+```bash
+# 1. Check the command output for folder path
+ppp issue update F01 "New Feature Name"
+
+# 2. Verify folder exists with new name
+ls -la .ppp/ | grep F01-
+
+# 3. Check issue details
+ppp issue list F01
+
+# 4. Verify spec.md contains updated name
+cat .ppp/F01-new-feature-name/spec.md | grep "#"
+
+# 5. Check parent issue's Children section (if applicable)
+ppp issue list --parent F01  # Shows direct children
+```
+
+**Troubleshooting folder updates:**
+- **Folder not renamed?** Check if the folder name was manually changed (system respects manual renames)
+- **Path issues?** Verify the folder exists using `ppp issue list [issue_id]`
+- **Permission errors?** Ensure write permissions in the .ppp directory
+- **Case sensitivity?** Use exact case for issue IDs in commands
+
+**Robust Folder Location System:**
+The system uses stable ID prefixes (e.g., `F01-`) for folder identification, allowing users to freely rename the descriptive suffix after the dash. This means:
+- ✅ Safe: `F01-old-name` → `F01-new-better-name` (automatic)
+- ✅ Safe: Manual renames won't break the system
+- ✅ Safe: Case variations in commands work (F01 = f01)
+- ❌ Never change: The ID prefix before the dash
 
 If the other detailed issue attribute or description needs to be updated, user can directly edit the issue file.
 
@@ -439,6 +514,11 @@ During **sprint add issue**, ppp will:
 - in the sprint file of the sprint folder, add the issue to the sprint's issue list;
 - in the issue file of the issue folder, update the issue's sprint assignment to the provided sprint ID;
 - in the sprint folder, create a symlink folder to the issue folder with issue folder name as folder name;
+- **Symlink Management**: PPP uses ID-based symlink detection for robust sprint-issue relationships:
+  - **ID-based detection**: Symlinks are identified by target issue ID, not folder name
+  - **Existence checking**: System checks for existing symlinks before creating/removing
+  - **Automatic cleanup**: Removes stale symlinks during issue/sprint operations
+  - **Name independence**: Works regardless of folder name changes or manual renames
 
 #### remove issue from sprint
 ***sprint remove*** command removes an issue from a sprint with the provided sprint ID during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_id>`.

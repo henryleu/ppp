@@ -101,6 +101,11 @@ export class HybridManager {
     // Save metadata to database
     await databaseManager.createIssue(metadata);
 
+    // Sync parent issue file if this issue has a parent (to update parent's Children section)
+    if (normalizedParentId) {
+      await this.syncParentIssueFile(normalizedParentId);
+    }
+
     return issue;
   }
 
@@ -155,6 +160,11 @@ export class HybridManager {
       const folderPath = await fileManager.updateIssueFolder(issue, oldKeywords);
       // folder_path no longer stored in database - computed dynamically when needed
       issue.folderPath = folderPath;
+
+      // Sync parent issue file if name changed (to update parent's Children section links)
+      if (updates.name && updatedMetadata.parent_id) {
+        await this.syncParentIssueFile(updatedMetadata.parent_id);
+      }
     }
 
     return issue;
@@ -169,14 +179,21 @@ export class HybridManager {
       throw new Error('Invalid issue ID provided');
     }
     
-    // Get folder path before deleting from database (since getIssueFolderPath needs database info)
+    // Get folder path and parent ID before deleting from database 
     const folderPath = await fileManager.getIssueFolderPath(normalizedIssueId);
+    const issueMetadata = await databaseManager.getIssue(normalizedIssueId);
+    const parentId = issueMetadata?.parent_id;
 
     // Delete from database (handles relationships)
     await databaseManager.deleteIssue(normalizedIssueId);
 
     // Move folder to archive using the pre-retrieved path
     await fileManager.deleteIssueFolderByPath(normalizedIssueId, folderPath);
+
+    // Sync parent issue file if this issue had a parent (to update parent's Children section)
+    if (parentId) {
+      await this.syncParentIssueFile(parentId);
+    }
   }
 
   /**
@@ -776,6 +793,29 @@ export class HybridManager {
     }
 
     await writeFile(releasePath, releaseContent);
+  }
+
+  /**
+   * Sync parent issue file with updated children data from database
+   * This ensures parent's Children section reflects current database state
+   */
+  private async syncParentIssueFile(parentId: string): Promise<void> {
+    try {
+      // Get parent issue metadata from database
+      const parentMetadata = await databaseManager.getIssue(parentId);
+      if (!parentMetadata) {
+        console.warn(`Parent issue ${parentId} not found in database`);
+        return;
+      }
+
+      // Convert metadata to Issue object
+      const parentIssue = await this.metadataToIssue(parentMetadata);
+      
+      // Update parent's spec.md file with current children data
+      await fileManager.updateIssueFolderWithChildren(parentIssue, parentMetadata.children);
+    } catch (error) {
+      console.warn(`Failed to sync parent issue file for ${parentId}:`, error);
+    }
   }
 }
 
