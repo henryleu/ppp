@@ -1,9 +1,70 @@
 import { Command } from 'commander';
+import Table from 'cli-table3';
 import { IssueType, IssuePriority, IssueStatus } from '../types/issue.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
-import { createTable } from '../utils/table.js';
 import { truncateText } from '../utils/llm.js';
 import { normalizeObjectId } from '../utils/object-id-normalizer.js';
+
+// Color utility functions for enhanced UI
+function getStatusColor(status: IssueStatus): string {
+  switch (status) {
+    case IssueStatus.NEW:
+      return '\x1b[36m'; // Cyan
+    case IssueStatus.IN_PROGRESS:
+      return '\x1b[33m'; // Yellow
+    case IssueStatus.DONE:
+      return '\x1b[32m'; // Green
+    case IssueStatus.BLOCKED:
+      return '\x1b[31m'; // Red
+    case IssueStatus.CANCELLED:
+      return '\x1b[90m'; // Gray
+    default:
+      return '\x1b[0m'; // Reset
+  }
+}
+
+function getPriorityColor(priority: IssuePriority): string {
+  switch (priority) {
+    case IssuePriority.HIGH:
+      return '\x1b[91m'; // Bright Red
+    case IssuePriority.MEDIUM:
+      return '\x1b[93m'; // Bright Yellow
+    case IssuePriority.LOW:
+      return '\x1b[92m'; // Bright Green
+    default:
+      return '\x1b[0m'; // Reset
+  }
+}
+
+function getTypeColor(type: IssueType): string {
+  switch (type) {
+    case IssueType.FEATURE:
+      return '\x1b[94m'; // Bright Blue
+    case IssueType.STORY:
+      return '\x1b[96m'; // Bright Cyan
+    case IssueType.TASK:
+      return '\x1b[37m'; // White
+    case IssueType.BUG:
+      return '\x1b[95m'; // Bright Magenta
+    default:
+      return '\x1b[0m'; // Reset
+  }
+}
+
+function getTypeIcon(type: IssueType): string {
+  switch (type) {
+    case IssueType.FEATURE:
+      return '🎯';
+    case IssueType.STORY:
+      return '📖';
+    case IssueType.TASK:
+      return '✅';
+    case IssueType.BUG:
+      return '🐛';
+    default:
+      return '📋';
+  }
+}
 
 export function createIssueCommand(): Command {
   const issueCommand = new Command('issue');
@@ -155,7 +216,7 @@ export function createIssueCommand(): Command {
         console.log(`Keywords: ${updatedIssue.keywords}`);
         console.log(`Status: ${updatedIssue.status}`);
         console.log(`Priority: ${updatedIssue.priority}`);
-        
+
         // Show folder path if name was updated (indicates potential folder change)
         if (name && updatedIssue.folderPath) {
           console.log(`Folder: ${updatedIssue.folderPath}`);
@@ -203,7 +264,6 @@ export function createIssueCommand(): Command {
       try {
         let parentIssue = null;
         let effectiveParentId = options.parent;
-
         let issues: any[];
 
         // If issueId is provided, validate it exists and show hierarchical view of descendants
@@ -225,7 +285,7 @@ export function createIssueCommand(): Command {
         } else {
           // No issueId provided - show only top-level issues (no parent)
           effectiveParentId = options.parent || null;
-          
+
           issues = await hybridManager.listIssues({
             parentId: effectiveParentId,
             type: options.type as IssueType,
@@ -236,61 +296,97 @@ export function createIssueCommand(): Command {
           });
         }
 
-        // Show appropriate message based on context
+        // Enhanced empty state messages with emojis
         if (issues.length === 0) {
           if (parentIssue) {
-            console.log(`No descendant issues found under ${parentIssue.id} (${parentIssue.name}).`);
+            console.log(`\n${getTypeIcon(parentIssue.type)} Hierarchical view under ${parentIssue.id}: ${parentIssue.name}`);
+            console.log('═'.repeat(65));
+            console.log('\n💭 No descendant issues found under this parent.');
+            console.log('   Create child issues with: ppp issue create <type> <parent_id> "<name>"');
           } else if (effectiveParentId) {
-            console.log(`No issues found with parent ${effectiveParentId}.`);
+            console.log(`\n👥 Issues with parent ${effectiveParentId}:`);
+            console.log('═'.repeat(45));
+            console.log('\n💭 No issues found with this parent.');
+            console.log('   Create child issues with: ppp issue create <type> <parent_id> "<name>"');
           } else {
-            console.log('No issues found.');
+            console.log('\n🏗️  Top-level issues:');
+            console.log('═'.repeat(25));
+            console.log('\n💭 No issues found. Create one with: ppp issue create <type> "<name>"');
           }
           return;
         }
 
-        // Show context based on listing type
+        // Enhanced header with emojis and better formatting
         if (parentIssue) {
           // Hierarchical view of descendants under specific parent
-          console.log(`\nHierarchical view under ${parentIssue.id}: ${parentIssue.name}`);
-          console.log(`Type: ${parentIssue.type} | Status: ${parentIssue.status} | Priority: ${parentIssue.priority}`);
-          console.log('-'.repeat(60));
+          console.log(`\n${getTypeIcon(parentIssue.type)} Hierarchical view under ${parentIssue.id}: ${parentIssue.name}`);
+          const statusColor = getStatusColor(parentIssue.status);
+          const priorityColor = getPriorityColor(parentIssue.priority);
+          console.log(`   ${getTypeColor(parentIssue.type)}${parentIssue.type}\x1b[0m | ${statusColor}${parentIssue.status}\x1b[0m | ${priorityColor}${parentIssue.priority}\x1b[0m`);
+          console.log('═'.repeat(65));
         } else if (effectiveParentId) {
           // Flat view filtered by parent
-          console.log(`\nIssues with parent ${effectiveParentId}:`);
-          console.log('-'.repeat(40));
+          console.log(`\n👥 Issues with parent ${effectiveParentId}:`);
+          console.log('═'.repeat(45));
         } else {
           // Top-level issues (no parent)
-          console.log(`\nTop-level issues:`);
-          console.log('-'.repeat(20));
+          console.log(`\n🏗️  Top-level issues:`);
+          console.log('═'.repeat(25));
         }
 
-        const table = createTable({
+        const table = new Table({
           head: ['ID', 'Name', 'Type', 'Status', 'Priority', 'Assignee', 'Parent'],
-          colWidths: [12, 37, 12, 14, 10, 15, 12]
+          colWidths: [12, 35, 10, 14, 12, 15, 12],
+          style: {
+            'padding-left': 1,
+            'padding-right': 1,
+            head: [],
+            border: []
+          },
+          chars: {
+            'top': '─',
+            'top-mid': '┬',
+            'top-left': '┌',
+            'top-right': '┐',
+            'bottom': '─',
+            'bottom-mid': '┴',
+            'bottom-left': '└',
+            'bottom-right': '┘',
+            'left': '│',
+            'left-mid': '├',
+            'mid': '─',
+            'mid-mid': '┼',
+            'right': '│',
+            'right-mid': '┤',
+            'middle': '│'
+          }
         });
 
         issues.forEach(issue => {
+          const statusColor = getStatusColor(issue.status);
+          const priorityColor = getPriorityColor(issue.priority);
+          const typeColor = getTypeColor(issue.type);
+
           table.push([
             issue.id,
-            truncateText(issue.name, 37),
-            issue.type,
-            issue.status,
-            issue.priority,
+            truncateText(issue.name, 35),
+            typeColor + issue.type + '\x1b[0m',
+            statusColor + issue.status + '\x1b[0m',
+            priorityColor + issue.priority + '\x1b[0m',
             issue.assignee || '-',
             issue.parentId || '-'
           ]);
         });
 
-        console.log('\nIssues:\n');
-        console.log(table.toString());
+        console.log('\n' + table.toString());
 
-        // Show appropriate total message
+        // Enhanced summary messages with icons
         if (parentIssue) {
-          console.log(`\nTotal: ${issues.length} issues in hierarchy under ${parentIssue.id}`);
+          console.log(`\n📊 Total: ${issues.length} issues in hierarchy under ${parentIssue.id}`);
         } else if (effectiveParentId) {
-          console.log(`\nTotal: ${issues.length} issues with parent ${effectiveParentId}`);
+          console.log(`\n📊 Total: ${issues.length} issues with parent ${effectiveParentId}`);
         } else {
-          console.log(`\nTotal: ${issues.length} top-level issues`);
+          console.log(`\n📊 Total: ${issues.length} top-level issues`);
         }
       } catch (error) {
         console.error(`[ERROR] Failed to list issues: ${error instanceof Error ? error.message : 'Unknown error'}`);
