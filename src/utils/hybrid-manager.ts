@@ -3,6 +3,7 @@ import { fileManager } from './file-manager.js';
 import { generateIssueId } from './id-generator.js';
 import { generateIssueNameKeywords } from './llm.js';
 import { fileExists } from './settings.js';
+import { normalizeObjectId } from './object-id-normalizer.js';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import {
@@ -12,7 +13,7 @@ import {
   IssueUpdate
 } from '../types/database.js';
 import { Issue, IssueCreationData, IssueType, IssueStatus, IssuePriority } from '../types/issue.js';
-import { Sprint, SprintStatus, SprintCreationData, generateSprintId } from '../types/sprint.js';
+import { Sprint, SprintStatus, SprintCreationData, SprintSummary, generateSprintId } from '../types/sprint.js';
 
 /**
  * Hybrid manager that coordinates between YAML database (metadata) and markdown files (content)
@@ -32,11 +33,14 @@ export class HybridManager {
    * Create a new issue with both metadata and content file
    */
   public async createIssue(data: IssueCreationData): Promise<Issue> {
+    // Normalize parentId to uppercase following CLI.md rules
+    const normalizedParentId = normalizeObjectId(data.parentId);
+
     // Validate parent relationship (same as before)
-    await this.validateParent(data.type, data.parentId);
+    await this.validateParent(data.type, normalizedParentId);
 
     // Generate issue ID using existing logic
-    const id = await generateIssueId(data.type, data.parentId);
+    const id = await generateIssueId(data.type, normalizedParentId);
 
     // Generate keywords
     let keywords: string;
@@ -61,7 +65,7 @@ export class HybridManager {
       assignee: data.assignee,
       reporter: data.reporter,
       labels: data.labels || [],
-      parent_id: data.parentId,
+      parent_id: normalizedParentId,
       sprint_id: undefined,
       created_at: now,
       updated_at: now,
@@ -81,7 +85,7 @@ export class HybridManager {
       assignee: data.assignee,
       reporter: data.reporter,
       labels: data.labels || [],
-      parentId: data.parentId,
+      parentId: normalizedParentId,
       sprintId: undefined,
       createdAt: now,
       updatedAt: now,
@@ -104,10 +108,15 @@ export class HybridManager {
    * Update an issue's metadata and sync with file if needed
    */
   public async updateIssue(issueId: string, updates: Partial<IssueCreationData>): Promise<Issue> {
+    const normalizedIssueId = normalizeObjectId(issueId);
+    if (!normalizedIssueId) {
+      throw new Error('Invalid issue ID provided');
+    }
+    
     // Get current metadata
-    const metadata = await databaseManager.getIssue(issueId);
+    const metadata = await databaseManager.getIssue(normalizedIssueId);
     if (!metadata) {
-      throw new Error(`Issue ${issueId} not found`);
+      throw new Error(`Issue ${normalizedIssueId} not found`);
     }
 
     let keywords = metadata.keywords;
@@ -135,7 +144,7 @@ export class HybridManager {
     if (updates.labels) dbUpdates.labels = updates.labels;
 
     // Update metadata in database
-    const updatedMetadata = await databaseManager.updateIssue(issueId, dbUpdates);
+    const updatedMetadata = await databaseManager.updateIssue(normalizedIssueId, dbUpdates);
 
     // Create full issue object for file operations if needed
     const issue: Issue = await this.metadataToIssue(updatedMetadata);
@@ -155,14 +164,19 @@ export class HybridManager {
    * Delete an issue from both database and files
    */
   public async deleteIssue(issueId: string): Promise<void> {
+    const normalizedIssueId = normalizeObjectId(issueId);
+    if (!normalizedIssueId) {
+      throw new Error('Invalid issue ID provided');
+    }
+    
     // Get folder path before deleting from database (since getIssueFolderPath needs database info)
-    const folderPath = await fileManager.getIssueFolderPath(issueId);
+    const folderPath = await fileManager.getIssueFolderPath(normalizedIssueId);
 
     // Delete from database (handles relationships)
-    await databaseManager.deleteIssue(issueId);
+    await databaseManager.deleteIssue(normalizedIssueId);
 
     // Move folder to archive using the pre-retrieved path
-    await fileManager.deleteIssueFolderByPath(issueId, folderPath);
+    await fileManager.deleteIssueFolderByPath(normalizedIssueId, folderPath);
   }
 
   /**
@@ -172,12 +186,12 @@ export class HybridManager {
     // Convert filter to database format
     const dbFilter: IssueFilter = {};
     if (filter) {
-      if (filter.parentId !== undefined) dbFilter.parent_id = filter.parentId;
+      if (filter.parentId !== undefined) dbFilter.parent_id = normalizeObjectId(filter.parentId);
       if (filter.type) dbFilter.type = filter.type;
       if ((filter as any).status) dbFilter.status = (filter as any).status;
       if (filter.assignee !== undefined) dbFilter.assignee = filter.assignee;
       if (filter.labels) dbFilter.labels = filter.labels;
-      if ((filter as any).sprintId !== undefined) dbFilter.sprint_id = (filter as any).sprintId;
+      if ((filter as any).sprintId !== undefined) dbFilter.sprint_id = normalizeObjectId((filter as any).sprintId);
     }
 
     const metadataList = await databaseManager.getIssues(dbFilter);
@@ -294,7 +308,10 @@ export class HybridManager {
    * Get issue by ID
    */
   public async getIssue(issueId: string): Promise<Issue | null> {
-    const metadata = await databaseManager.getIssue(issueId);
+    const normalizedIssueId = normalizeObjectId(issueId);
+    if (!normalizedIssueId) return null;
+    
+    const metadata = await databaseManager.getIssue(normalizedIssueId);
     if (!metadata) return null;
 
     return this.metadataToIssue(metadata);
@@ -304,14 +321,42 @@ export class HybridManager {
    * Assign issue to sprint
    */
   public async assignIssueToSprint(issueId: string, sprintId: string): Promise<void> {
-    await databaseManager.addIssueToSprint(issueId, sprintId);
+    const normalizedIssueId = normalizeObjectId(issueId);
+    const normalizedSprintId = normalizeObjectId(sprintId);
+    if (!normalizedIssueId || !normalizedSprintId) {
+      throw new Error('Invalid issue ID or sprint ID provided');
+    }
+    await databaseManager.addIssueToSprint(normalizedIssueId, normalizedSprintId);
+    
+    // Create symlink in sprint folder
+    await fileManager.createIssueSymlink(normalizedSprintId, normalizedIssueId);
+    
+    // Sync spec.md file from database (single source of truth)
+    const updatedSprint = await this.getSprint(normalizedSprintId);
+    if (updatedSprint) {
+      await fileManager.updateSprintSpec(updatedSprint);
+    }
   }
 
   /**
    * Remove issue from sprint
    */
   public async removeIssueFromSprint(issueId: string, sprintId: string): Promise<void> {
-    await databaseManager.removeIssueFromSprint(issueId, sprintId);
+    const normalizedIssueId = normalizeObjectId(issueId);
+    const normalizedSprintId = normalizeObjectId(sprintId);
+    if (!normalizedIssueId || !normalizedSprintId) {
+      throw new Error('Invalid issue ID or sprint ID provided');
+    }
+    await databaseManager.removeIssueFromSprint(normalizedIssueId, normalizedSprintId);
+    
+    // Remove symlink from sprint folder
+    await fileManager.removeIssueSymlink(normalizedSprintId, normalizedIssueId);
+    
+    // Sync spec.md file from database (single source of truth)
+    const updatedSprint = await this.getSprint(normalizedSprintId);
+    if (updatedSprint) {
+      await fileManager.updateSprintSpec(updatedSprint);
+    }
   }
 
   /**
@@ -377,10 +422,29 @@ export class HybridManager {
   }
 
   /**
+   * Get all sprints as summaries with accurate issue counts from database
+   */
+  public async getSprintSummaries(): Promise<SprintSummary[]> {
+    const sprints = await this.getSprints();
+    return sprints.map(sprint => ({
+      id: sprint.id,
+      name: sprint.name,
+      status: sprint.status,
+      startDate: sprint.startDate,
+      endDate: sprint.endDate,
+      issueCount: sprint.issues.length, // Accurate count from database
+      velocity: sprint.velocity
+    }));
+  }
+
+  /**
    * Get sprint by ID
    */
   public async getSprint(sprintId: string): Promise<Sprint | null> {
-    const metadata = await databaseManager.getSprint(sprintId);
+    const normalizedSprintId = normalizeObjectId(sprintId);
+    if (!normalizedSprintId) return null;
+    
+    const metadata = await databaseManager.getSprint(normalizedSprintId);
     if (!metadata) return null;
 
     return this.metadataToSprint(metadata);
@@ -390,10 +454,13 @@ export class HybridManager {
    * Add issue to sprint
    */
   public async addIssueToSprint(issueId: string, sprintNo: string): Promise<boolean> {
+    const normalizedIssueId = normalizeObjectId(issueId);
+    if (!normalizedIssueId) return false;
+    
     const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
 
     try {
-      await databaseManager.addIssueToSprint(issueId, sprintId);
+      await databaseManager.addIssueToSprint(normalizedIssueId, sprintId);
 
       // Update sprint markdown file
       const sprint = await this.getSprint(sprintId);

@@ -229,6 +229,9 @@ export class SprintManager {
 
       // Update issue's sprint assignment
       await this.updateIssueSprintAssignment(issueId, sprintId);
+
+      // Update Release.md to reflect the issue count change
+      await this.updateReleaseFile(sprint, 'update');
     }
 
     return true;
@@ -260,6 +263,9 @@ export class SprintManager {
 
       // Remove issue's sprint assignment
       await this.updateIssueSprintAssignment(issueId, undefined);
+
+      // Update Release.md to reflect the issue count change
+      await this.updateReleaseFile(sprint, 'update');
     }
 
     return true;
@@ -355,7 +361,7 @@ export class SprintManager {
     return completedCount;
   }
 
-  private async updateReleaseFile(sprint: Sprint, operation: 'create' | 'delete' | 'activate' | 'complete'): Promise<void> {
+  private async updateReleaseFile(sprint: Sprint, operation: 'create' | 'delete' | 'activate' | 'complete' | 'update'): Promise<void> {
     const releasePath = join(fileManager.getPppPath(), 'Release.md');
 
     let releaseContent = '';
@@ -378,6 +384,15 @@ export class SprintManager {
         /## Current Sprint\n\n.*?(?=\n\n##)/s,
         `## Current Sprint\n\nNo active sprint.`
       );
+    } else if (operation === 'update') {
+      // Check if this sprint is currently active and update current sprint section
+      const activeSprint = await this.getActiveSprint();
+      if (activeSprint && activeSprint.id === sprint.id) {
+        releaseContent = releaseContent.replace(
+          /## Current Sprint\n\n.*?(?=\n\n##)/s,
+          `## Current Sprint\n\n**${sprint.name}** - ${sprint.description}\n- Status: ${sprint.status}\n- Start Date: ${new Date(sprint.startDate).toLocaleDateString()}\n- Issues: ${sprint.issues.length}`
+        );
+      }
     }
 
     // Update sprint list table
@@ -397,7 +412,7 @@ export class SprintManager {
         // Remove the sprint row
         const lines = tableRows.split('\n');
         tableRows = lines.filter(line => !line.includes(sprint.id)).join('\n');
-      } else if (operation === 'activate' || operation === 'complete') {
+      } else if (operation === 'activate' || operation === 'complete' || operation === 'update') {
         // Update the existing row
         const lines = tableRows.split('\n');
         const updatedLines = lines.map(line => {

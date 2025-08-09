@@ -2,14 +2,11 @@ import { Command } from 'commander';
 import prompts from 'prompts';
 import Table from 'cli-table3';
 import { sprintManager } from '../utils/sprint.js';
+import { hybridManager } from '../utils/hybrid-manager.js';
 import { SprintStatus } from '../types/sprint.js';
+import { normalizeObjectId } from '../utils/object-id-normalizer.js';
 
-// Utility functions for Object ID normalization following CLI.md rules
-function normalizeObjectId(id: string): string {
-  // Convert Object IDs to uppercase (F01, T010101, B010101, etc.)
-  return id.toUpperCase();
-}
-
+// Sprint ID specific normalization helper
 function normalizeSprintId(sprintId: string): string {
   // Handle Sprint IDs: S01 → 01, s01 → 01, 01 → 01
   const cleanNo = sprintId.replace(/^[sS]/i, '');
@@ -158,7 +155,7 @@ export function createSprintCommand(): Command {
     .description('List all sprints with their status')
     .action(async () => {
       try {
-        const sprints = await sprintManager.getAllSprints();
+        const sprints = await hybridManager.getSprintSummaries();
 
         if (sprints.length === 0) {
           console.log('No sprints found. Create one with "ppp sprint create".');
@@ -166,30 +163,32 @@ export function createSprintCommand(): Command {
         }
 
         const table = new Table({
-          head: ['Sprint', 'Status', 'Start Date', 'End Date', 'Issues', 'Velocity'],
-          colWidths: [12, 12, 12, 12, 8, 10]
+          head: ['Sprint ID', 'Status', 'Start Date', 'End Date', 'Issues', 'Velocity', 'Name'],
+          colWidths: [12, 12, 12, 12, 8, 10, 20]
         });
 
         for (const sprint of sprints) {
           const statusColor = getStatusColor(sprint.status);
           table.push([
-            sprint.name,
+            sprint.id,
             statusColor + sprint.status + '\x1b[0m',
             new Date(sprint.startDate).toLocaleDateString(),
             sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : '-',
             sprint.issueCount.toString(),
-            sprint.velocity.toString()
+            sprint.velocity.toString(),
+            sprint.name
           ]);
         }
 
         console.log('\n' + table.toString());
 
         // Show active sprint separately
-        const activeSprint = await sprintManager.getActiveSprint();
+        const activeSprint = await hybridManager.getActiveSprint();
         if (activeSprint) {
-          console.log(`\n🚀 Active Sprint: ${activeSprint.name}`);
-          console.log(`   Description: ${activeSprint.description}`);
-          console.log(`   Issues: ${activeSprint.issues.length}`);
+          console.log(`\n🚀 Active Sprint: ${activeSprint.id}`);
+          console.log(`  Name: ${activeSprint.name}`);
+          console.log(`  Description: ${activeSprint.description}`);
+          console.log(`  Issues: ${activeSprint.issues.length}`);
         } else {
           console.log(`\n💡 No active sprint. Use "ppp sprint activate <sprint_id>" to activate one.`);
         }
@@ -210,17 +209,13 @@ export function createSprintCommand(): Command {
       try {
         const normalizedIssueId = normalizeObjectId(issueId);
         const normalizedSprintNo = normalizeSprintId(sprintId);
-        const success = await sprintManager.addIssueToSprint(normalizedIssueId, normalizedSprintNo);
-
-        if (!success) {
-          console.error(`Sprint ${sprintId} not found.`);
-          process.exit(1);
-        }
+        const sprintIdFormatted = `S${normalizedSprintNo}`;
+        
+        await hybridManager.assignIssueToSprint(normalizedIssueId, sprintIdFormatted);
 
         console.log(`✓ Issue ${normalizedIssueId} added to Sprint ${sprintId} successfully!`);
-        console.log('Issue sprint assignment has been updated.');
+        console.log('Issue sprint assignment has been updated in database.');
         console.log('Sprint spec file has been updated.');
-        console.log('Issue symlink created in sprint folder.');
 
       } catch (error) {
         console.error('Failed to add issue to sprint:', error instanceof Error ? error.message : error);
@@ -238,17 +233,13 @@ export function createSprintCommand(): Command {
       try {
         const normalizedIssueId = normalizeObjectId(issueId);
         const normalizedSprintNo = normalizeSprintId(sprintId);
-        const success = await sprintManager.removeIssueFromSprint(normalizedIssueId, normalizedSprintNo);
-
-        if (!success) {
-          console.error(`Sprint ${sprintId} not found.`);
-          process.exit(1);
-        }
+        const sprintIdFormatted = `S${normalizedSprintNo}`;
+        
+        await hybridManager.removeIssueFromSprint(normalizedIssueId, sprintIdFormatted);
 
         console.log(`\n✓ Issue ${normalizedIssueId} removed from Sprint ${sprintId} successfully!\n`);
-        console.log('Issue sprint assignment has been cleared.');
+        console.log('Issue sprint assignment has been cleared in database.');
         console.log('Sprint spec file has been updated.');
-        console.log('Issue symlink removed from sprint folder.');
 
       } catch (error) {
         console.error('Failed to remove issue from sprint:', error instanceof Error ? error.message : error);

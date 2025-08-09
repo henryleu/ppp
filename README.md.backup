@@ -345,7 +345,7 @@ During **sprint creation**, ppp will:
 If the other detailed sprint attributes or comments needs to be updated, user can directly edit the sprint file.
 
 #### delete sprint
-***sprint delete*** command deletes a sprint with sprint no provided during the command execution. And it uses `delete` sub command and goes like `ppp sprint delete <sprint_no>`.
+***sprint delete*** command deletes a sprint with sprint no provided during the command execution. And it uses `delete` sub command and goes like `ppp sprint delete <sprint_id>`.
 
 During **sprint updation**, ppp will:
 - update all the issues assigned to the sprint to remove the sprint assignment if the sprint is in progress;
@@ -353,14 +353,14 @@ During **sprint updation**, ppp will:
 - update Release file to remove the sprint from the sprint list;
 
 #### activate sprint
-***sprint activate*** command activates a sprint with sprint no provided during the command execution. And it uses `activate` sub command and goes like `ppp sprint activate <sprint_no>`.
+***sprint activate*** command activates a sprint with sprint no provided during the command execution. And it uses `activate` sub command and goes like `ppp sprint activate <sprint_id>`.
 
 During **sprint activation**, ppp will:
 - update Release file to activate the sprint in the sprint list;
 - update all the issues assigned to the sprint to set their status to 'In Progress';
 
 #### add issue to sprint
-***sprint add*** command adds an issue to a sprint with sprint no provided during the command execution. And it uses `add` sub command and goes like `ppp sprint add <issue_id> <sprint_no>`.
+***sprint add*** command adds an issue to a sprint with sprint no provided during the command execution. And it uses `add` sub command and goes like `ppp sprint add <issue_id> <sprint_id>`.
 
 During **sprint add issue**, ppp will:
 - update the issue's sprint assignment to the sprint no in its issue file;
@@ -368,7 +368,7 @@ During **sprint add issue**, ppp will:
 - maintain bidirectional relationship between issue and sprint;
 
 #### remove issue from sprint
-***sprint remove*** command removes an issue from a sprint with sprint no provided during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_no>`.
+***sprint remove*** command removes an issue from a sprint with sprint no provided during the command execution. And it uses `remove` sub command and goes like `ppp sprint remove <issue_id> <sprint_id>`.
 
 During **sprint remove issue**, ppp will:
 - update the issue's sprint assignment to remove the sprint reference in its issue file;

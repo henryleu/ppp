@@ -16,6 +16,27 @@ ppp (Product Prompt Planner) is command line tool which is used to manage featur
 - **Object Folder**: a folder represents the unstructured data part of an Project Object that contains all the files and folders related to an Project Object for the project management. It is stored in the .ppp project folder. the spec file in the folder will be fed to LLM/Coding Assist(Claude Code/Cursor/Trae) as a well-described task prompt for coding. the spec file in the folder is the main file for the project object. all the information in the spec file is used for LLM/Coding Assist/AI Agents as user prompt.
 - **Object ID**: unique identifier for an object. it is always with a suffix to distinguish different types of objects plus a fixed digits populated by increment number backed by counters in database.yml file. it is used for object indexing, folder locating and status tracking. it is also used for object folder name and object record file name.
 
+**Common Rules:**
+- **Object ID Normalization**: All Object IDs must be stored and processed in uppercase format throughout the system. This includes:
+  - Issue IDs (F01, T010101, B010101) 
+  - Sprint IDs (S01, S02)
+  - Parent-child relationships (parent_id field)
+  - User input in commands must be normalized to uppercase before processing
+  - Database storage and comparisons use uppercase format
+  - Object IDs are always generated with uppercase suffix character (which represents an Object Type)
+  - When using Object ID in commands, it needs to be converted to uppercase so that the input object ID can match the stored object IDs in database
+
+- **Database as Single Source of Truth**: All operations use the database for counting and logic. This ensures:
+  - All sprint/issue operations query database for accurate counts and relationships
+  - Command outputs (like sprint list) display real-time data from database
+  - Consistent data across all operations regardless of file system state
+  - Bidirectional relationships (sprint-issue) maintained accurately in database
+
+- **Automatic File Sync**: Database changes trigger file system updates to maintain consistency. This includes:
+  - Spec.md files automatically updated after database operations
+  - Symlinks created/removed based on database state
+  - Markdown content reflects current database relationships
+  - File system serves as synchronized representation of database truth
 
 ## Building Blocks
 All PPP features are built on top of following building blocks:
@@ -109,6 +130,23 @@ All PPP features are built on top of following building blocks:
 - `issue symlink folders`: Issue symlink folders which are soft sym links used to link to the actual issue folders. i.e. `F01-admin`, `F0101-user_management`, `F010102-update_user`, `T01010201-check_username`, etc.
 
 **Sprint Spec File** is generated automatically when sprint is created. The file that contains all the sprint attributes, **Sprint Issues** and other details under **Sprint Folder**. i.e. `S01/spec.md`, `S02/spec.md`, etc.
+
+**Sprint Issues in Spec File**
+The Issues section in sprint spec.md files displays issues as clickable markdown links:
+- Issue items are formatted as markdown links using the symlink folder name as link text
+- Each link points to the corresponding issue's spec.md file within its symlink folder  
+- Format: `- [ ] [F01-feature_name](F01-feature_name/spec.md)`
+- This enables direct navigation from sprint documentation to individual issue specifications
+- Links are automatically updated when issues are added to or removed from sprints
+
+**Example:**
+```markdown
+## Issues
+
+- [ ] [F01-admin_dashboard](F01-admin_dashboard/spec.md)
+- [ ] [F0102-user_management](F0102-user_management/spec.md)  
+- [ ] [T010201-create_user_form](T010201-create_user_form/spec.md)
+```
 
 1. **Sprint Attributes**
   - **Sprint ID**: ID of the sprint. i.e. S01, S02, etc. 'S' is the prefix of sprint ID. '01' and '02' are fixed 2-digit number which are the number of the sprint which will be incremented automatically backed by the counter in database file.
@@ -415,3 +453,43 @@ During **sprint remove issue**, ppp will:
 - in the sprint file of the sprint folder, remove the issue from the sprint's issue list;
 - in the issue file of the issue folder, update the issue's sprint assignment to None;
 - in the sprint folder, remove the symlink folder to the issue folder if it exists;
+
+#### list sprints
+***sprint list*** command displays all sprints with their current status and metadata in a tabular format. And it uses `list` sub command and goes like `ppp sprint list`.
+
+During **sprint listing**, ppp will:
+- retrieve all sprint records from the database and filesystem;
+- display sprints in a formatted table showing:
+  - ID (Sprint ID)
+  - Current status (planned, active, completed, archived) with color coding
+  - Start date in localized format
+  - End date (if completed) or dash if still in progress
+  - Number of assigned issues
+  - Sprint velocity (completed issues count)
+  - Sprint name (truncated if too long)
+- highlight the currently active sprint below the table with additional details:
+  - Sprint ID, name and description
+  - Total number of assigned issues
+- show helpful message if no active sprint exists with activation command hint;
+
+**Status Color Coding:**
+- **Planned**: Cyan - sprint is created but not yet started
+- **Active**: Green - sprint is currently in progress
+- **Completed**: Yellow - sprint has been finished
+- **Archived**: Gray - sprint has been archived
+
+**Example Output:**
+```
+┌────────────┬────────────┬────────────┬────────────┬────────┬──────────┬────────────┐
+│ Sprint ID  │ Status     │ Start Date │ End Date   │ Issues │ Velocity │ Name       │
+├────────────┼────────────┼────────────┼────────────┼────────┼──────────┼────────────┤
+│ S01        │ active     │ 8/8/2025   │ -          │ 3      │ 0        │ Sprint 1   │
+│ S02        │ completed  │ 8/7/2025   │ 8/8/2025   │ 5      │ 4        │ Sprint 2   │
+│ S03        │ planned    │ 8/6/2025   │ -          │ 2      │ 0        │ Sprint 3   │
+└────────────┴────────────┴────────────┴────────────┴────────┴──────────┴────────────┘
+
+🚀 Active Sprint: S01
+  Name: Sprint 1
+  Description: Core features implementation
+  Issues: 3
+```

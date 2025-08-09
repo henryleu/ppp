@@ -3,6 +3,7 @@ import { IssueType, IssuePriority, IssueStatus } from '../types/issue.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
 import { createTable } from '../utils/table.js';
 import { truncateText } from '../utils/llm.js';
+import { normalizeObjectId } from '../utils/object-id-normalizer.js';
 
 export function createIssueCommand(): Command {
   const issueCommand = new Command('issue');
@@ -66,7 +67,7 @@ export function createIssueCommand(): Command {
           assignee: options.assignee,
           reporter: options.reporter,
           labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : [],
-          parentId: actualParentId
+          parentId: normalizeObjectId(actualParentId)
         };
 
         const issue = await hybridManager.createIssue(issueData);

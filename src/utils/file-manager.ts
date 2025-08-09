@@ -342,7 +342,7 @@ export class FileManager {
 
     // Create spec.md file in sprint folder
     const specFilePath = join(sprintFolderPath, 'spec.md');
-    const content = this.generateSprintContent(sprint);
+    const content = await this.generateSprintContent(sprint);
     await writeFile(specFilePath, content);
 
     return sprintFolderPath;
@@ -353,7 +353,7 @@ export class FileManager {
 
     // Update spec.md file in sprint folder
     const specFilePath = join(this.getPppPath(), sprint.id, 'spec.md');
-    const content = this.generateSprintContent(sprint);
+    const content = await this.generateSprintContent(sprint);
     await writeFile(specFilePath, content);
 
     return specFilePath;
@@ -374,7 +374,36 @@ export class FileManager {
     }
   }
 
+  /**
+   * Generate symlink folder name using full object ID and keywords from existing folder
+   * Example: F0102 + "F02-user_mgmt" -> "F0102-user_mgmt"
+   */
+  private generateSymlinkFolderName(issueId: string, issueFolderPath: string): string {
+    // Extract the immediate folder name
+    const folderName = issueFolderPath.split('/').pop();
+    if (!folderName) {
+      return `${issueId}-folder`;
+    }
+
+    // Extract keywords from existing folder name (everything after the first dash)
+    const dashIndex = folderName.indexOf('-');
+    if (dashIndex === -1) {
+      // No keywords found, use issue ID only
+      return `${issueId}-folder`;
+    }
+
+    const keywords = folderName.substring(dashIndex + 1);
+    return `${issueId}-${keywords}`;
+  }
+
   public async createIssueSymlink(sprintId: string, issueId: string): Promise<void> {
+    // Check if symlink already exists using ID-based detection
+    const existingSymlink = await this.findSymlinkByIssueId(sprintId, issueId);
+    if (existingSymlink) {
+      // Symlink already exists, no need to create
+      return;
+    }
+
     const sprintFolderPath = join(this.getPppPath(), sprintId);
     const issueFolderPath = await this.getIssueFolderPath(issueId);
 
@@ -383,14 +412,9 @@ export class FileManager {
       return;
     }
 
-    // Extract folder name from the full path
-    const issueFolderName = issueFolderPath.split('/').pop();
-    if (!issueFolderName) {
-      console.warn(`Could not extract folder name from path: ${issueFolderPath}`);
-      return;
-    }
-
-    const symlinkPath = join(sprintFolderPath, issueFolderName);
+    // Generate symlink folder name using full object ID
+    const symlinkFolderName = this.generateSymlinkFolderName(issueId, issueFolderPath);
+    const symlinkPath = join(sprintFolderPath, symlinkFolderName);
 
     try {
       // Create symbolic link to the issue folder
@@ -402,26 +426,16 @@ export class FileManager {
   }
 
   public async removeIssueSymlink(sprintId: string, issueId: string): Promise<void> {
-    const sprintFolderPath = join(this.getPppPath(), sprintId);
-    const issueFolderPath = await this.getIssueFolderPath(issueId);
-
-    if (!issueFolderPath) {
+    // Find existing symlink using ID-based detection
+    const existingSymlink = await this.findSymlinkByIssueId(sprintId, issueId);
+    if (!existingSymlink) {
+      // Symlink doesn't exist, nothing to remove
       return;
     }
-
-    // Extract folder name from the full path
-    const issueFolderName = issueFolderPath.split('/').pop();
-    if (!issueFolderName) {
-      return;
-    }
-
-    const symlinkPath = join(sprintFolderPath, issueFolderName);
 
     try {
-      if (await fileExists(symlinkPath)) {
-        const { unlink } = await import('fs/promises');
-        await unlink(symlinkPath);
-      }
+      const { unlink } = await import('fs/promises');
+      await unlink(existingSymlink);
     } catch (error) {
       console.warn(`Failed to remove symlink for issue ${issueId}:`, error);
     }
@@ -498,9 +512,28 @@ ${commentsSection}
 `;
   }
 
-  private generateSprintContent(sprint: Sprint): string {
+  /**
+   * Generate markdown links for issues in sprint spec.md
+   * Creates clickable links using symlink folder names that point to spec.md files
+   */
+  private async generateIssueLinksSection(issueIds: string[]): Promise<string> {
+    const linkPromises = issueIds.map(async (issueId) => {
+      const issueFolderPath = await this.getIssueFolderPath(issueId);
+      if (!issueFolderPath) {
+        return `- [ ] ${issueId} (not found)`;
+      }
+      
+      const symlinkFolderName = this.generateSymlinkFolderName(issueId, issueFolderPath);
+      return `- [ ] [${symlinkFolderName}](${symlinkFolderName}/spec.md)`;
+    });
+    
+    const issueLinks = await Promise.all(linkPromises);
+    return issueLinks.join('\n');
+  }
+
+  private async generateSprintContent(sprint: Sprint): Promise<string> {
     const issuesSection = sprint.issues.length > 0
-      ? `\n\n## Issues\n\n${sprint.issues.map(issueId => `- [ ] ${issueId}`).join('\n')}`
+      ? `\n\n## Issues\n\n${await this.generateIssueLinksSection(sprint.issues)}`
       : '\n\n## Issues\n\nNo issues assigned to this sprint.';
 
     return `# ${sprint.name}
@@ -647,6 +680,53 @@ ${issuesSection}
     sprint.issues = sprint.issues || [];
 
     return sprint as Sprint;
+  }
+
+  /**
+   * Find symlink by issue ID using ID-based detection
+   * Scans sprint folder for symlinks and checks their targets to match against issue ID
+   */
+  public async findSymlinkByIssueId(sprintId: string, issueId: string): Promise<string | null> {
+    try {
+      const sprintFolderPath = join(this.getPppPath(), sprintId);
+      if (!(await fileExists(sprintFolderPath))) {
+        return null;
+      }
+
+      const entries = await readdir(sprintFolderPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (entry.isSymbolicLink()) {
+          const symlinkPath = join(sprintFolderPath, entry.name);
+          try {
+            // Read the symlink target
+            const { readlink } = await import('fs/promises');
+            const targetPath = await readlink(symlinkPath);
+            
+            // Get issue folder path to compare
+            const expectedIssueFolderPath = await this.getIssueFolderPath(issueId);
+            if (expectedIssueFolderPath) {
+              // Compare absolute paths
+              const { resolve } = await import('path');
+              const resolvedTarget = resolve(sprintFolderPath, targetPath);
+              const resolvedExpected = resolve(expectedIssueFolderPath);
+              
+              if (resolvedTarget === resolvedExpected) {
+                return symlinkPath;
+              }
+            }
+          } catch (error) {
+            // Skip invalid symlinks
+            continue;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn(`Failed to find symlink for issue ${issueId} in sprint ${sprintId}:`, error);
+      return null;
+    }
   }
 }
 
