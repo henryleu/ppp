@@ -117,7 +117,7 @@ export class HybridManager {
     if (!normalizedIssueId) {
       throw new Error('Invalid issue ID provided');
     }
-    
+
     // Get current metadata
     const metadata = await databaseManager.getIssue(normalizedIssueId);
     if (!metadata) {
@@ -178,8 +178,8 @@ export class HybridManager {
     if (!normalizedIssueId) {
       throw new Error('Invalid issue ID provided');
     }
-    
-    // Get folder path and parent ID before deleting from database 
+
+    // Get folder path and parent ID before deleting from database
     const folderPath = await fileManager.getIssueFolderPath(normalizedIssueId);
     const issueMetadata = await databaseManager.getIssue(normalizedIssueId);
     const parentId = issueMetadata?.parent_id;
@@ -203,7 +203,10 @@ export class HybridManager {
     // Convert filter to database format
     const dbFilter: IssueFilter = {};
     if (filter) {
-      if (filter.parentId !== undefined) dbFilter.parent_id = normalizeObjectId(filter.parentId);
+      // Handle parentId filtering: null means "no parent", undefined means "don't filter by parent"
+      if (filter.parentId !== undefined) {
+        dbFilter.parent_id = filter.parentId === null ? undefined : normalizeObjectId(filter.parentId);
+      }
       if (filter.type) dbFilter.type = filter.type;
       if ((filter as any).status) dbFilter.status = (filter as any).status;
       if (filter.assignee !== undefined) dbFilter.assignee = filter.assignee;
@@ -327,7 +330,7 @@ export class HybridManager {
   public async getIssue(issueId: string): Promise<Issue | null> {
     const normalizedIssueId = normalizeObjectId(issueId);
     if (!normalizedIssueId) return null;
-    
+
     const metadata = await databaseManager.getIssue(normalizedIssueId);
     if (!metadata) return null;
 
@@ -344,10 +347,10 @@ export class HybridManager {
       throw new Error('Invalid issue ID or sprint ID provided');
     }
     await databaseManager.addIssueToSprint(normalizedIssueId, normalizedSprintId);
-    
+
     // Create symlink in sprint folder
     await fileManager.createIssueSymlink(normalizedSprintId, normalizedIssueId);
-    
+
     // Sync spec.md file from database (single source of truth)
     const updatedSprint = await this.getSprint(normalizedSprintId);
     if (updatedSprint) {
@@ -365,10 +368,10 @@ export class HybridManager {
       throw new Error('Invalid issue ID or sprint ID provided');
     }
     await databaseManager.removeIssueFromSprint(normalizedIssueId, normalizedSprintId);
-    
+
     // Remove symlink from sprint folder
     await fileManager.removeIssueSymlink(normalizedSprintId, normalizedIssueId);
-    
+
     // Sync spec.md file from database (single source of truth)
     const updatedSprint = await this.getSprint(normalizedSprintId);
     if (updatedSprint) {
@@ -460,7 +463,7 @@ export class HybridManager {
   public async getSprint(sprintId: string): Promise<Sprint | null> {
     const normalizedSprintId = normalizeObjectId(sprintId);
     if (!normalizedSprintId) return null;
-    
+
     const metadata = await databaseManager.getSprint(normalizedSprintId);
     if (!metadata) return null;
 
@@ -473,7 +476,7 @@ export class HybridManager {
   public async addIssueToSprint(issueId: string, sprintNo: string): Promise<boolean> {
     const normalizedIssueId = normalizeObjectId(issueId);
     if (!normalizedIssueId) return false;
-    
+
     const sprintId = `Sprint-${sprintNo.padStart(2, '0')}`;
 
     try {
@@ -810,7 +813,7 @@ export class HybridManager {
 
       // Convert metadata to Issue object
       const parentIssue = await this.metadataToIssue(parentMetadata);
-      
+
       // Update parent's spec.md file with current children data
       await fileManager.updateIssueFolderWithChildren(parentIssue, parentMetadata.children);
     } catch (error) {

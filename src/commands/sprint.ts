@@ -5,6 +5,21 @@ import { sprintManager } from '../utils/sprint.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
 import { SprintStatus } from '../types/sprint.js';
 import { normalizeObjectId } from '../utils/object-id-normalizer.js';
+import {
+  displaySuccessHeader,
+  displayWarningHeader,
+  displayErrorHeader,
+  displayInfoTable,
+  displayNextSteps,
+  displaySimpleSuccess,
+  displaySimpleWarning,
+  displaySimpleError,
+  displaySummary,
+  getStatusIcon,
+  actionIcons,
+  formatPath,
+  getColoredStatus
+} from '../utils/ui-helpers.js';
 
 export function createSprintCommand(): Command {
   const sprint = new Command('sprint');
@@ -39,15 +54,30 @@ export function createSprintCommand(): Command {
           name: sprintName
         });
 
-        console.log(`\n✓ Sprint created successfully!\n`);
-        console.log(`Sprint: ${sprint.name}`);
-        console.log(`ID: ${sprint.id}`);
-        console.log(`Status: ${sprint.status}`);
-        console.log(`Start Date: ${new Date(sprint.startDate).toLocaleDateString()}`);
-        console.log(`Folder: .ppp/${sprint.id}/`);
-        console.log(`Spec File: .ppp/${sprint.id}/spec.md`);
+        // Enhanced UI display
+        displaySuccessHeader('Sprint Creation Successful!', actionIcons.sprint);
+
+        const tableData = [
+          { label: 'Sprint ID', value: sprint.id, icon: actionIcons.id },
+          { label: 'Name', value: sprint.name, icon: actionIcons.name },
+          { label: 'Status', value: `${getStatusIcon(sprint.status)} ${getColoredStatus(sprint.status)}`, icon: actionIcons.status },
+          { label: 'Start Date', value: new Date(sprint.startDate).toLocaleDateString(), icon: actionIcons.date },
+          { label: 'Folder', value: `.ppp/${sprint.id}/`, icon: actionIcons.folder },
+          { label: 'Spec File', value: `.ppp/${sprint.id}/spec.md`, icon: '📄' }
+        ];
+
+        displayInfoTable(tableData);
+
+        // Next steps
+        const nextSteps = [
+          `Add issues: ppp sprint add <issue_id> <sprint_no>`,
+          `Activate sprint: ppp sprint activate <sprint_no>`,
+          `View sprint: ppp sprint list`
+        ];
+        displayNextSteps('Next Steps', nextSteps);
       } catch (error) {
-        console.error('Failed to create sprint:', error instanceof Error ? error.message : error);
+        displayErrorHeader('Sprint Creation Failed');
+        displaySimpleError(`Failed to create sprint: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });
@@ -63,13 +93,24 @@ export function createSprintCommand(): Command {
         const success = await sprintManager.activateSprint(normalizedSprintId);
 
         if (!success) {
-          console.error(`Sprint ${sprintId} not found.`);
+          displayErrorHeader('Sprint Activation Failed');
+          displaySimpleError(`Sprint ${sprintId} not found.`);
           process.exit(1);
         }
 
-        console.log(`\n✓ Sprint ${sprintId} activated successfully!\n`);
+        displaySuccessHeader('Sprint Activation Successful!', actionIcons.activate);
+        
+        displaySimpleSuccess(`${actionIcons.sprint} Sprint ${sprintId} is now ACTIVE!`);
+        
+        const summaryItems = [
+          { label: 'Status Change', value: 'Planned → Active' },
+          { label: 'Issues Status', value: 'All moved to "In Progress"' },
+          { label: 'Previous Active Sprint', value: 'Automatically completed' }
+        ];
+        displaySummary('Activation Summary', summaryItems);
       } catch (error) {
-        console.error('Failed to activate sprint:', error instanceof Error ? error.message : error);
+        displayErrorHeader('Sprint Activation Failed');
+        displaySimpleError(`Failed to activate sprint: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });
@@ -201,9 +242,23 @@ export function createSprintCommand(): Command {
 
         await hybridManager.assignIssueToSprint(normalizedIssueId, normalizedSprintId);
 
-        console.log(`✓ Issue ${normalizedIssueId} added to Sprint ${sprintId} successfully!`);
+        displaySuccessHeader('Issue Added to Sprint!', actionIcons.add);
+        
+        displaySimpleSuccess(`${actionIcons.sprint} ${normalizedIssueId} → Sprint-${sprintId.padStart(2, '0')}`);
+        
+        // Get updated sprint info for summary
+        const sprint = await hybridManager.getSprint(`Sprint-${sprintId.padStart(2, '0')}`);
+        if (sprint) {
+          const summaryItems = [
+            { label: 'Total Issues in Sprint', value: sprint.issues.length.toString() },
+            { label: 'Sprint Status', value: sprint.status },
+            { label: 'Symlink Created', value: `.ppp/Sprint-${sprintId.padStart(2, '0')}/` }
+          ];
+          displaySummary('Sprint Update', summaryItems);
+        }
       } catch (error) {
-        console.error('Failed to add issue to sprint:', error instanceof Error ? error.message : error);
+        displayErrorHeader('Failed to Add Issue to Sprint');
+        displaySimpleError(`Failed to add issue to sprint: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });
@@ -221,9 +276,23 @@ export function createSprintCommand(): Command {
 
         await hybridManager.removeIssueFromSprint(normalizedIssueId, normalizedSprintId);
 
-        console.log(`\n✓ Issue ${normalizedIssueId} removed from Sprint ${sprintId} successfully!\n`);
+        displaySuccessHeader('Issue Removed from Sprint!', actionIcons.remove);
+        
+        displaySimpleSuccess(`${actionIcons.sprint} ${normalizedIssueId} removed from Sprint-${sprintId.padStart(2, '0')}`);
+        
+        // Get updated sprint info for summary
+        const sprint = await hybridManager.getSprint(`Sprint-${sprintId.padStart(2, '0')}`);
+        if (sprint) {
+          const summaryItems = [
+            { label: 'Remaining Issues in Sprint', value: sprint.issues.length.toString() },
+            { label: 'Sprint Status', value: sprint.status },
+            { label: 'Symlink Removed', value: `.ppp/Sprint-${sprintId.padStart(2, '0')}/` }
+          ];
+          displaySummary('Sprint Update', summaryItems);
+        }
       } catch (error) {
-        console.error('Failed to remove issue from sprint:', error instanceof Error ? error.message : error);
+        displayErrorHeader('Failed to Remove Issue from Sprint');
+        displaySimpleError(`Failed to remove issue from sprint: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });

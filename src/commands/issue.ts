@@ -4,6 +4,25 @@ import { IssueType, IssuePriority, IssueStatus } from '../types/issue.js';
 import { hybridManager } from '../utils/hybrid-manager.js';
 import { truncateText } from '../utils/llm.js';
 import { normalizeObjectId } from '../utils/object-id-normalizer.js';
+import {
+  displaySuccessHeader,
+  displayWarningHeader,
+  displayErrorHeader,
+  displayInfoTable,
+  displayNextSteps,
+  displaySimpleSuccess,
+  displaySimpleWarning,
+  displaySimpleError,
+  displaySummary,
+  getTypeIcon,
+  getStatusIcon,
+  getPriorityIcon,
+  getColoredStatus,
+  getColoredPriority,
+  getColoredType,
+  actionIcons,
+  formatPath
+} from '../utils/ui-helpers.js';
 
 // Color utility functions for enhanced UI
 function getStatusColor(status: IssueStatus): string {
@@ -51,19 +70,66 @@ function getTypeColor(type: IssueType): string {
   }
 }
 
-function getTypeIcon(type: IssueType): string {
-  switch (type) {
-    case IssueType.FEATURE:
-      return '🎯';
-    case IssueType.STORY:
-      return '📖';
-    case IssueType.TASK:
-      return '✅';
-    case IssueType.BUG:
-      return '🐛';
-    default:
-      return '📋';
+
+// Helper function to detect feature hierarchy level
+function getIssueLevel(issueId: string): number | null {
+  if (!issueId.startsWith('F')) {
+    return null; // Only features have levels
   }
+  
+  const digits = issueId.slice(1); // Remove 'F' prefix
+  if (digits.length % 2 !== 0) {
+    return null; // Invalid format
+  }
+  
+  return Math.floor(digits.length / 2); // F01=1, F0101=2, F010101=3
+}
+
+// Helper function to check if an issue matches level criteria
+function matchesLevelFilter(issue: any, level: number, topLevel: boolean, allIssues: any[]): boolean {
+  if (topLevel) {
+    // For --top-level flag, only show issues with no parent
+    // This is handled by parentId filter, but we can also check level 1 features
+    if (issue.id.startsWith('F')) {
+      return getIssueLevel(issue.id) === 1;
+    }
+    return !issue.parentId; // Non-features with no parent
+  }
+  
+  if (level > 0) {
+    // For --level option, include all issues up to and including the specified level
+    if (issue.id.startsWith('F')) {
+      // For features, include if their level <= specified level
+      const issueLevel = getIssueLevel(issue.id);
+      return issueLevel !== null && issueLevel <= level;
+    } else {
+      // For non-features (tasks, bugs), include if their root parent feature level <= specified level
+      const rootParentLevel = getRootParentLevel(issue, allIssues);
+      return rootParentLevel !== null && rootParentLevel <= level;
+    }
+  }
+  
+  return true; // No level filter applied
+}
+
+// Helper function to get the root parent feature level for non-feature issues
+function getRootParentLevel(issue: any, allIssues: any[]): number | null {
+  if (!issue.parentId) return null;
+  
+  // Find the root feature parent by traversing up the hierarchy
+  let currentIssue = issue;
+  while (currentIssue.parentId) {
+    const parent = allIssues.find(i => i.id === currentIssue.parentId);
+    if (!parent) break;
+    
+    if (parent.id.startsWith('F')) {
+      // Found a feature parent, get its level
+      return getIssueLevel(parent.id);
+    }
+    currentIssue = parent;
+  }
+  
+  return null;
 }
 
 export function createIssueCommand(): Command {
@@ -133,17 +199,35 @@ export function createIssueCommand(): Command {
 
         const issue = await hybridManager.createIssue(issueData);
 
-        console.log(`[OK] Issue created successfully!`);
-        console.log(`ID: ${issue.id}`);
-        console.log(`Name: ${issue.name}`);
-        console.log(`Keywords: ${issue.keywords}`);
-        console.log(`Folder: ${issue.folderPath}`);
+        // Enhanced UI display
+        displaySuccessHeader('Issue Creation Successful!', getTypeIcon(issue.type));
+
+        const tableData = [
+          { label: 'ID', value: issue.id, icon: actionIcons.id },
+          { label: 'Name', value: issue.name, icon: actionIcons.name },
+          { label: 'Type', value: getColoredType(issue.type), icon: getTypeIcon(issue.type) },
+          { label: 'Keywords', value: issue.keywords, icon: actionIcons.keywords },
+          { label: 'Priority', value: `${getPriorityIcon(issue.priority)} ${getColoredPriority(issue.priority)}`, icon: actionIcons.priority },
+          { label: 'Status', value: `${getStatusIcon(issue.status)} ${getColoredStatus(issue.status)}`, icon: actionIcons.status },
+          { label: 'Folder', value: formatPath(issue.folderPath || ''), icon: actionIcons.folder }
+        ];
 
         if (actualParentId) {
-          console.log(`Parent: ${actualParentId}`);
+          tableData.push({ label: 'Parent', value: actualParentId, icon: actionIcons.parent });
         }
+
+        displayInfoTable(tableData);
+
+        // Next steps
+        const nextSteps = [
+          `Edit details: ppp issue update ${issue.id} "<new_name>"`,
+          `View hierarchy: ppp issue list ${issue.id}`,
+          `Add to sprint: ppp sprint add ${issue.id} <sprint_no>`
+        ];
+        displayNextSteps('Next Steps', nextSteps);
       } catch (error) {
-        console.error(`[ERROR] Failed to create issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        displayErrorHeader('Issue Creation Failed');
+        displaySimpleError(`Failed to create issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });
@@ -210,19 +294,31 @@ export function createIssueCommand(): Command {
 
         const updatedIssue = await hybridManager.updateIssue(issueId, updateData);
 
-        console.log(`[OK] Issue updated successfully!`);
-        console.log(`ID: ${updatedIssue.id}`);
-        console.log(`Name: ${updatedIssue.name}`);
-        console.log(`Keywords: ${updatedIssue.keywords}`);
-        console.log(`Status: ${updatedIssue.status}`);
-        console.log(`Priority: ${updatedIssue.priority}`);
+        // Enhanced UI display
+        displaySuccessHeader('Issue Update Successful!', actionIcons.update);
 
-        // Show folder path if name was updated (indicates potential folder change)
+        const tableData = [
+          { label: 'ID', value: updatedIssue.id, icon: actionIcons.id },
+          { label: 'Name', value: updatedIssue.name, icon: actionIcons.name },
+          { label: 'Type', value: getColoredType(updatedIssue.type), icon: getTypeIcon(updatedIssue.type) },
+          { label: 'Keywords', value: updatedIssue.keywords, icon: actionIcons.keywords },
+          { label: 'Status', value: `${getStatusIcon(updatedIssue.status)} ${getColoredStatus(updatedIssue.status)}`, icon: actionIcons.status },
+          { label: 'Priority', value: `${getPriorityIcon(updatedIssue.priority)} ${getColoredPriority(updatedIssue.priority)}`, icon: actionIcons.priority }
+        ];
+
+        if (updatedIssue.assignee) {
+          tableData.push({ label: 'Assignee', value: updatedIssue.assignee, icon: '👤' });
+        }
+
+        displayInfoTable(tableData);
+
+        // Show folder update notification if name was updated
         if (name && updatedIssue.folderPath) {
-          console.log(`Folder: ${updatedIssue.folderPath}`);
+          displaySimpleSuccess(`${actionIcons.folder} Folder updated: ${formatPath(updatedIssue.folderPath)}`, actionIcons.info);
         }
       } catch (error) {
-        console.error(`[ERROR] Failed to update issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        displayErrorHeader('Issue Update Failed');
+        displaySimpleError(`Failed to update issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });
@@ -236,16 +332,26 @@ export function createIssueCommand(): Command {
     .action(async (issueId, options) => {
       try {
         if (!options.force) {
-          console.log(`[WARNING] This will move issue ${issueId} to archive.`);
-          console.log('Use --force to confirm deletion.');
+          displayWarningHeader('Confirm Issue Deletion', actionIcons.warning);
+          displaySimpleWarning(`This will move issue ${issueId} to archive. Use --force to confirm deletion.`);
           process.exit(1);
         }
 
         await hybridManager.deleteIssue(issueId);
 
-        console.log(`[OK] Issue ${issueId} deleted successfully (moved to archive)`);
+        displaySuccessHeader('Issue Deletion Successful!', actionIcons.delete);
+        
+        displaySimpleSuccess(`${actionIcons.archive} Issue ${issueId} has been moved to archive`, actionIcons.info);
+        
+        const summaryItems = [
+          { label: 'Archive Location', value: '.ppp/_archived/' },
+          { label: 'Parent issues', value: 'Updated automatically' },
+          { label: 'Sprint assignments', value: 'Removed automatically' }
+        ];
+        displaySummary('Archive Details', summaryItems);
       } catch (error) {
-        console.error(`[ERROR] Failed to delete issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        displayErrorHeader('Issue Deletion Failed');
+        displaySimpleError(`Failed to delete issue: ${error instanceof Error ? error.message : 'Unknown error'}`);
         process.exit(1);
       }
     });
@@ -260,8 +366,21 @@ export function createIssueCommand(): Command {
     .option('-a, --assignee <assignee>', 'Filter by assignee name')
     .option('-l, --labels <labels>', 'Filter by labels (comma-separated)')
     .option('--sprint <sprint_id>', 'Filter by sprint ID')
+    .option('--top-level', 'Show only top-level issues (no parent)')
+    .option('--level <level>', 'Show all issues up to specified feature level (1, 2, 3)')
     .action(async (issueId, options) => {
       try {
+        // Validate mutually exclusive options
+        if (options.topLevel && options.level) {
+          console.error('[ERROR] --top-level and --level options cannot be used together');
+          process.exit(1);
+        }
+
+        if (options.level && (options.level < 1 || options.level > 3)) {
+          console.error('[ERROR] --level must be 1, 2, or 3');
+          process.exit(1);
+        }
+
         let parentIssue = null;
         let effectiveParentId = options.parent;
         let issues: any[];
@@ -283,8 +402,17 @@ export function createIssueCommand(): Command {
             sprintId: options.sprint
           });
         } else {
-          // No issueId provided - show only top-level issues (no parent)
-          effectiveParentId = options.parent || null;
+          // Handle --top-level and --level options
+          if (options.topLevel) {
+            // Force parentId to null for top-level issues
+            effectiveParentId = null;
+          } else if (options.level) {
+            // For level filtering, we need to get all issues first and filter by level
+            effectiveParentId = options.parent; // undefined to get all issues if no parent specified
+          } else {
+            // Default behavior: show only top-level issues (no parent)
+            effectiveParentId = options.parent !== undefined ? options.parent : null;
+          }
 
           issues = await hybridManager.listIssues({
             parentId: effectiveParentId,
@@ -294,6 +422,12 @@ export function createIssueCommand(): Command {
             labels: options.labels ? options.labels.split(',').map((l: string) => l.trim()) : undefined,
             sprintId: options.sprint
           });
+
+          // Apply level-based filtering if needed
+          if (options.level || options.topLevel) {
+            const level = options.level ? parseInt(options.level) : 0;
+            issues = issues.filter(issue => matchesLevelFilter(issue, level, options.topLevel, issues));
+          }
         }
 
         // Enhanced empty state messages with emojis
@@ -303,6 +437,20 @@ export function createIssueCommand(): Command {
             console.log('═'.repeat(65));
             console.log('\n💭 No descendant issues found under this parent.');
             console.log('   Create child issues with: ppp issue create <type> <parent_id> "<name>"');
+          } else if (options.level) {
+            console.log(`\n🏗️  Issues up to level ${options.level}:`);
+            console.log('═'.repeat(25));
+            console.log(`\n💭 No issues found up to level ${options.level}.`);
+            if (options.level === 1) {
+              console.log('   Create one with: ppp issue create feature "<name>"');
+            } else {
+              console.log(`   Create features with: ppp issue create feature <parent_id> "<name>"`);
+            }
+          } else if (options.topLevel) {
+            console.log('\n🏗️  Top-level issues:');
+            console.log('═'.repeat(25));
+            console.log('\n💭 No top-level issues found.');
+            console.log('   Create one with: ppp issue create feature "<name>"');
           } else if (effectiveParentId) {
             console.log(`\n👥 Issues with parent ${effectiveParentId}:`);
             console.log('═'.repeat(45));
@@ -311,7 +459,7 @@ export function createIssueCommand(): Command {
           } else {
             console.log('\n🏗️  Top-level issues:');
             console.log('═'.repeat(25));
-            console.log('\n💭 No issues found. Create one with: ppp issue create <type> "<name>"');
+            console.log('\n💭 No issues found. Create one with: ppp issue create feature "<name>"');
           }
           return;
         }
@@ -324,12 +472,20 @@ export function createIssueCommand(): Command {
           const priorityColor = getPriorityColor(parentIssue.priority);
           console.log(`   ${getTypeColor(parentIssue.type)}${parentIssue.type}\x1b[0m | ${statusColor}${parentIssue.status}\x1b[0m | ${priorityColor}${parentIssue.priority}\x1b[0m`);
           console.log('═'.repeat(65));
+        } else if (options.level) {
+          // Level-filtered view
+          console.log(`\n🏗️  Issues up to level ${options.level}:`);
+          console.log('═'.repeat(25));
+        } else if (options.topLevel) {
+          // Explicitly requested top-level view
+          console.log('\n🏗️  Top-level issues:');
+          console.log('═'.repeat(25));
         } else if (effectiveParentId) {
           // Flat view filtered by parent
           console.log(`\n👥 Issues with parent ${effectiveParentId}:`);
           console.log('═'.repeat(45));
         } else {
-          // Top-level issues (no parent)
+          // Default: top-level issues (no parent)
           console.log(`\n🏗️  Top-level issues:`);
           console.log('═'.repeat(25));
         }
@@ -383,6 +539,10 @@ export function createIssueCommand(): Command {
         // Enhanced summary messages with icons
         if (parentIssue) {
           console.log(`\n📊 Total: ${issues.length} issues in hierarchy under ${parentIssue.id}`);
+        } else if (options.level) {
+          console.log(`\n📊 Total: ${issues.length} issues up to level ${options.level}`);
+        } else if (options.topLevel) {
+          console.log(`\n📊 Total: ${issues.length} top-level issues`);
         } else if (effectiveParentId) {
           console.log(`\n📊 Total: ${issues.length} issues with parent ${effectiveParentId}`);
         } else {

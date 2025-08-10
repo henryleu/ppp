@@ -410,19 +410,32 @@ During **issue deletion**, ppp will:
 
 #### list issue
 
-***issue list*** command displays issues in various formats depending on parameters provided. It supports three modes: top-level listing, hierarchical tree view, and parent-filtered view. The command uses `list` sub command and maintains proper hierarchical tree structure.
+***issue list*** command displays issues in various formats depending on parameters provided. It supports multiple modes: top-level listing, hierarchical tree view, parent-filtered view, and level-filtered view. The command uses `list` sub command and maintains proper hierarchical tree structure.
 
 **Usage:**
 - `ppp issue list` - Shows only top-level features (issues with no parent)
 - `ppp issue list [issue_id]` - Shows hierarchical tree of all descendants under specified issue
 - `ppp issue list --parent [parent_id]` - Shows direct children of specified parent only
+- `ppp issue list --top-level` - Explicitly shows only top-level issues (same as default)
+- `ppp issue list --level <level>` - Shows all issues up to specified hierarchy level (1, 2, or 3)
 
 **Options:**
 - `-p, --parent <parent_id>` - Filter by parent issue ID
 - `-t, --type <type>` - Filter by issue type (feature, story, task, bug)
 - `-s, --status <status>` - Filter by issue status (new, in_progress, done, blocked, cancelled)
 - `-a, --assignee <assignee>` - Filter by assignee name
+- `-l, --labels <labels>` - Filter by labels (comma-separated)
 - `--sprint <sprint_id>` - Filter by sprint ID
+- `--top-level` - Show only top-level issues (no parent)
+- `--level <level>` - Show all issues up to specified feature level (1, 2, 3)
+
+**Level-based Filtering:**
+The `--level` option shows all issues up to and including the specified hierarchy level:
+- **Level 1**: Shows level 1 features (F01, F02) and their direct children (tasks, bugs)
+- **Level 2**: Shows level 1-2 features (F01, F0101) and all their children (tasks, bugs)
+- **Level 3**: Shows level 1-3 features (F01, F0101, F010101) and all their children (complete hierarchy)
+
+Note: `--top-level` and `--level` options cannot be used together.
 
 **Key Features:**
 - **Hierarchical Tree Structure**: Maintains proper depth-first traversal order showing parent → children → grandchildren
@@ -466,6 +479,44 @@ T010102 - Password Reset
 ```bash
 $ ppp issue list F01 --type task --status new
 # Shows only new tasks in F01 hierarchy
+```
+
+5. **Top-level explicit listing** - Explicitly request top-level issues:
+```bash
+$ ppp issue list --top-level
+Top-level issues:
+F01 - Admin Dashboard
+F02 - User Management System
+F03 - Payment Gateway
+```
+
+6. **Level-based filtering** - Show all issues up to hierarchy level:
+```bash
+# Show level 1 features and their direct children
+$ ppp issue list --level 1
+Issues up to level 1:
+F01 - Admin Dashboard
+T0101 - Setup Database (under F01)
+F02 - User Management System
+
+# Show level 1-2 features and all their children
+$ ppp issue list --level 2  
+Issues up to level 2:
+F01 - Admin Dashboard
+F0101 - User Authentication (under F01)
+T010101 - Login API (under F0101)
+T0101 - Setup Database (under F01)
+F02 - User Management System
+
+# Show complete hierarchy (level 1-3 features and all children)
+$ ppp issue list --level 3
+Issues up to level 3:
+F01 - Admin Dashboard
+F0101 - User Authentication (under F01)
+F010101 - Login Screen (under F0101)
+T010101 - Login API (under F0101)
+T0101 - Setup Database (under F01)
+F02 - User Management System
 ```
 
 The hierarchical listing displays all descendants in proper tree order without numbered prefixes, making it easy to understand the complete project structure and relationships between issues.
